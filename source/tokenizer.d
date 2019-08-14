@@ -4,6 +4,7 @@ import utils;
 
 import core.stdc.ctype;
 import core.stdc.stdlib;
+import core.stdc.string;
 
 enum TokenKind
 {
@@ -19,6 +20,7 @@ struct Token
     Token *next;    // 次の入力トークン
     int val;        // kindがTK_NUMの場合，その数値
     char* str;      // トークン文字列
+    int len;        // トークンの長さ
 }
 
 
@@ -27,9 +29,11 @@ Token* token;       // 現在着目しているトークン
 
 // 次のトークンが期待している記号のときには，トークンを1つ読み進めて
 // 真を返す．それ以外の場合には偽を返す．
-bool consume(char op)
+bool consume(string op)
 {
-    if(token.kind != TokenKind.RESERVED || token.str[0] != op)
+    if(token.kind != TokenKind.RESERVED
+        || op.length != token.len
+        || memcmp(token.str, op.ptr, token.len))
         return false;
 
     token = token.next;
@@ -39,10 +43,12 @@ bool consume(char op)
 
 // 次のトークンが期待している記号のときには，トークンを1つ読み進める．
 // それ以外の場合にはエラーを報告する．
-void expect(char op)
+void expect(string op)
 {
-    if(token.kind != TokenKind.RESERVED || token.str[0] != op)
-        error(token.str, "'%c'ではありません", op);
+    if(token.kind != TokenKind.RESERVED
+        || op.length != token.len
+        || memcmp(token.str, op.ptr, token.len))
+        error(token.str, "'%c'ではありません", op.toStringz);
 
     token = token.next;
 }
@@ -67,11 +73,12 @@ bool at_eof()
 
 
 // 新しいトークンを作成してcurにつなげる
-Token* new_token(TokenKind kind, Token* cur, char* str)
+Token* new_token(TokenKind kind, Token* cur, char* str, int len)
 {
     Token* tok = new Token;
     tok.kind = kind;
     tok.str = str;
+    tok.len = len;
     cur.next = tok;
     return tok;
 }
@@ -90,21 +97,32 @@ Token* tokenize(char* p)
             continue;
         }
 
-        if(*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')') {
-            cur = new_token(TokenKind.RESERVED, cur, p);
+        if(*(p+1)) {
+            if(p[0 .. 2] == "==" || p[0 .. 2] == "!=" || p[0 .. 2] == "<=" || p[0 .. 2] == ">=") {
+                cur = new_token(TokenKind.RESERVED, cur, p, 2);
+                p += 2;
+                continue;
+            }
+        }
+
+        if(*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')' || *p == '>' || *p == '<') {
+            cur = new_token(TokenKind.RESERVED, cur, p, 1);
             ++p;
             continue;
         }
 
         if(isdigit(*p)) {
-            cur = new_token(TokenKind.NUM, cur, p);
-            cur.val = cast(int) strtol(p, &p, 10);
+            auto q = p;
+            int val = cast(int) strtol(q, &q, 10);
+            cur = new_token(TokenKind.NUM, cur, p, cast(int)(q - p));
+            cur.val = val;
+            p = q;
             continue;
         }
 
         error(p, "トークナイズできません");
     }
 
-    new_token(TokenKind.EOF, cur, p);
+    new_token(TokenKind.EOF, cur, p, 0);
     return head.next;
 }

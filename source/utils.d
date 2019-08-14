@@ -21,7 +21,6 @@ void error(char* loc, string fmt, ...) {
 }
 
 
-private
 char* toStringz(string str)
 {
     size_t len = str.length;

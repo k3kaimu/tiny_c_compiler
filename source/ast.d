@@ -51,9 +51,9 @@ Node* expr()
     Node* node = mul();
 
     while(1) {
-        if(consume('+'))
+        if(consume("+"))
             node = new_node(NodeKind.ADD, node, mul());
-        else if(consume('-'))
+        else if(consume("-"))
             node = new_node(NodeKind.SUB, node, mul());
         else
             return node;
@@ -67,9 +67,9 @@ Node* mul()
     Node* node = unary();
 
     while(1) {
-        if(consume('*'))
+        if(consume("*"))
             node = new_node(NodeKind.MUL, node, unary());
-        else if(consume('/'))
+        else if(consume("/"))
             node = new_node(NodeKind.DIV, node, unary());
         else
             return node;
@@ -80,9 +80,9 @@ Node* mul()
 // unary = ("+" | "-")? term
 Node* unary()
 {
-    if(consume('+'))
+    if(consume("+"))
         return term;
-    else if(consume('-'))
+    else if(consume("-"))
         return new_node(NodeKind.SUB, new_node_num(0), term());
     else
         return term();
@@ -92,9 +92,9 @@ Node* unary()
 // term = num | "(" expr ")"
 Node* term()
 {
-    if(consume('(')) {
+    if(consume("(")) {
         Node* node = expr();
-        expect(')');
+        expect(")");
         return node;
     }
 
