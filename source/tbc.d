@@ -7,5 +7,5 @@ import impl;
 
 int main(int argc, char** argv)
 {
-    return Main(stdin, argc, argv);
+    return Main(stdout, argc, argv);
 }
