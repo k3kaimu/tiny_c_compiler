@@ -33,4 +33,22 @@ unittest
     assert(test("5-(-(+5))", 10));
     assert(test("-10+20", 10));
     assert(test("-0-10-20-(-10-20)", 0));
+    assert(test("1 == 1", 1));
+    assert(test("1 != 1", 0));
+    assert(test("0 == 0", 1));
+    assert(test("(1 == 1) == (3 == 3)", 1));
+    assert(test("(1 != 1) == (3 != 3)", 1));
+    assert(test("(1 > 0) == (3 > 0)", 1));
+    assert(test("(1 < 0) == (3 > 0)", 0));
+    assert(test("(1 <= 0) == (3 >= 0)", 0));
+    assert(test("1>0", 1));
+    assert(test("0>0", 0));
+    assert(test("1>=0", 1));
+    assert(test("0>=0", 1));
+    assert(test("-1>=0", 0));
+    assert(test("1<0", 0));
+    assert(test("0<0", 0));
+    assert(test("-1<0", 1));
+    assert(test("1<=0", 0));
+    assert(test("0<=0", 1));
 }

@@ -8,6 +8,12 @@ enum NodeKind
     SUB,        // -
     MUL,        // *
     DIV,        // /
+    EQ,         // ==
+    NE,         // !=
+    LT,         // <
+    LE,         // <=
+    GT,         // >
+    GE,         // >=
     NUM,        // 整数
 }
 
@@ -45,8 +51,52 @@ Node* new_node_num(int val)
 }
 
 
-// expr = mul ("+" mul | "-" mul)*
+// expr = equality
 Node* expr()
+{
+    Node* node = equality();
+    return node;
+}
+
+
+// equality = relational ("==" relational | "!=" relational)*
+Node* equality()
+{
+    Node* node = relational();
+
+    while(1) {
+        if(consume("=="))
+            node = new_node(NodeKind.EQ, node, relational());
+        else if(consume("!="))
+            node = new_node(NodeKind.NE, node, relational());
+        else
+            return node;
+    }
+}
+
+
+// relational = add ("<" add | "<=" add | ">" add | ">=" add)*
+Node* relational()
+{
+    Node* node = add();
+
+    while(1) {
+        if(consume("<"))
+            node = new_node(NodeKind.LT, node, add());
+        else if(consume("<="))
+            node = new_node(NodeKind.LE, node, add());
+        else if(consume(">"))
+            node = new_node(NodeKind.GT, node, add());
+        else if(consume(">="))
+            node = new_node(NodeKind.GE, node, add());
+        else
+            return node;
+    }
+}
+
+
+// add = mul ("+" mul | "-" mul)*
+Node* add()
 {
     Node* node = mul();
 

@@ -31,9 +31,32 @@ int gen_llvm_ir(FILE* fp, Node* node, int* val_cnt)
         case NodeKind.DIV:
             fprintf(fp, "  %%%d = sdiv i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
             break;
+        case NodeKind.EQ:
+            fprintf(fp, "  %%%d = icmp eq i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
+            goto Lzext;
+        case NodeKind.NE:
+            fprintf(fp, "  %%%d = icmp ne i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
+            goto Lzext;
+        case NodeKind.LT:
+            fprintf(fp, "  %%%d = icmp slt i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
+            goto Lzext;
+        case NodeKind.LE:
+            fprintf(fp, "  %%%d = icmp sle i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
+            goto Lzext;
+        case NodeKind.GT:
+            fprintf(fp, "  %%%d = icmp sgt i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
+            goto Lzext;
+        case NodeKind.GE:
+            fprintf(fp, "  %%%d = icmp sge i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
+            goto Lzext;
         default:
             fprintf(stderr, "サポートしていないノードの種類です\n");
             exit(1);
+            break;
+
+        Lzext:
+            fprintf(fp, "  %%%d = zext i1 %%%d to i32\n", *val_cnt + 1, *val_cnt);
+            ++*val_cnt;
             break;
     }
 
