@@ -26,4 +26,11 @@ unittest
     assert(test("5+6*7", 47));
     assert(test("5* (9 - 6)", 15));
     assert(test("(3+5 ) /2", 4));
+    assert(test("+5", 5));
+    assert(test("5+(-5)", 0));
+    assert(test("5-5", 0));
+    assert(test("5-(+5)", 0));
+    assert(test("5-(-(+5))", 10));
+    assert(test("-10+20", 10));
+    assert(test("-0-10-20-(-10-20)", 0));
 }
