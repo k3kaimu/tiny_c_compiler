@@ -16,8 +16,8 @@ unittest
 
         Main(file.getFP, cast(int)args.length, cargs.ptr);
         file.flush();
-        auto output = execute(["lli", filename]);
-        return output.status == output;
+        auto lli = execute(["lli", filename]);
+        return lli.status == output;
     }
 
     assert(test("0", 0));

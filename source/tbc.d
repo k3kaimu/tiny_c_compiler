@@ -1,11 +1,10 @@
-extern(C):
+// extern(C):
 
-import core.stdc.stdio;
-import core.stdc.stdlib;
-
+import core.runtime;
+import std.stdio;
 import impl;
 
-int main(int argc, char** argv)
+int main()
 {
-    return Main(stdout, argc, argv);
+    return Main(stdout.getFP, Runtime.cArgs.tupleof);
 }
