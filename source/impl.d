@@ -6,6 +6,7 @@ import ast;
 import gen;
 
 import core.stdc.stdio;
+import core.stdc.string;
 
 
 int Main(FILE* fp, int argc, char** argv)
@@ -16,7 +17,8 @@ int Main(FILE* fp, int argc, char** argv)
     }
 
     user_input = argv[1];
-    token = tokenize(argv[1]);
+    size_t input_len = strlen(argv[1]);
+    token = tokenize(argv[1][0 .. input_len]);
     Node*[] codes = program();
 
     fprintf(fp, "define i32 @main() {\n");

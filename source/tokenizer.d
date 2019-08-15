@@ -80,81 +80,83 @@ Token* consume_ident()
 
 
 // 新しいトークンを作成してcurにつなげる
-Token* new_token(TokenKind kind, Token* cur, char* str, size_t len)
+Token* new_token(TokenKind kind, Token* cur, char[] str)
 {
     Token* tok = new Token;
     tok.kind = kind;
-    tok.str = str[0 .. len];
+    tok.str = str;
     cur.next = tok;
     return tok;
 }
 
 
-Token* tokenize(char* p)
+Token* tokenize(char[] str)
 {
     Token head;
     head.next = null;
     Token* cur = &head;
 
-    while(*p) {
+    while(str.length) {
         // 空白文字をスキップ
-        if(isspace(*p)) {
-            ++p;
+        if(isspace(str[0])) {
+            str = str[1 .. $];
             continue;
         }
 
-        if(*(p+1)) {
-            if(p[0 .. 2] == "==" || p[0 .. 2] == "!=" || p[0 .. 2] == "<=" || p[0 .. 2] == ">=") {
-                cur = new_token(TokenKind.RESERVED, cur, p, 2);
-                p += 2;
+        if(str.length >= 2) {
+            if(str[0 .. 2] == "==" || str[0 .. 2] == "!=" || str[0 .. 2] == "<=" || str[0 .. 2] == ">=") {
+                cur = new_token(TokenKind.RESERVED, cur, str[0 .. 2]);
+                str = str[2 .. $];
                 continue;
             }
         }
 
-        if(isalpha(*p)) {
+        if(isalpha(str[0])) {
             size_t len = 0;
             {
-                char* q = p;
-                while(isalnum(*q)) {
+                char[] q = str;
+                while(isalnum(q[0])) {
                     ++len;
-                    ++q;
+                    q = q[1 .. $];
                 }
             }
-            cur = new_token(TokenKind.IDENT, cur, p, len);
-            p += len;
+            cur = new_token(TokenKind.IDENT, cur, str[0 .. len]);
+            str = str[len .. $];
             continue;
         }
 
-        if(*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')' || *p == '>' || *p == '<') {
-            cur = new_token(TokenKind.RESERVED, cur, p, 1);
-            ++p;
+        if(str[0] == '+' || str[0] == '-' || str[0] == '*' || str[0] == '/' || str[0] == '(' || str[0] == ')' || str[0] == '>' || str[0] == '<') {
+            cur = new_token(TokenKind.RESERVED, cur, str[0 .. 1]);
+            str = str[1 .. $];
             continue;
         }
 
-        if(*p == '=') {
-            cur = new_token(TokenKind.RESERVED, cur, p, 1);
-            ++p;
+        if(str[0] == '=') {
+            cur = new_token(TokenKind.RESERVED, cur, str[0 .. 1]);
+            str = str[1 .. $];
             continue;
         }
 
-        if(*p == ';') {
-            cur = new_token(TokenKind.RESERVED, cur, p, 1);
-            ++p;
+        if(str[0] == ';') {
+            cur = new_token(TokenKind.RESERVED, cur, str[0 .. 1]);
+            str = str[1 .. $];
             continue;
         }
 
-        if(isdigit(*p)) {
-            auto q = p;
+        if(isdigit(str[0])) {
+            char* p = str.ptr;
+            char* q = p;
             int val = cast(int) strtol(q, &q, 10);
-            cur = new_token(TokenKind.NUM, cur, p, cast(int)(q - p));
+            int len = cast(int)(q - p);
+            cur = new_token(TokenKind.NUM, cur, str[0 .. len]);
             cur.val = val;
-            p = q;
+            str = str[len .. $];
             continue;
         }
 
-        error_at(p, "トークナイズできません");
+        error_at(str.ptr, "トークナイズできません");
     }
 
-    new_token(TokenKind.EOF, cur, p, 0);
+    new_token(TokenKind.EOF, cur, str[$ .. $]);
     return head.next;
 }
