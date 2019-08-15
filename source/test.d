@@ -56,4 +56,5 @@ unittest
     assert(test("a=1;b=a*2;", 2));
     assert(test("a=1;b=a*2;b=b*2;", 4));
     assert(test("foo=1;bar=foo*2;bar=bar*2;", 4));
+    assert(test("_=1; __=2; _a=3; a_b=4; _+__+_a+a_b;", 10));
 }

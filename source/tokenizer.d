@@ -111,11 +111,11 @@ Token* tokenize(char[] str)
             }
         }
 
-        if(isalpha(str[0])) {
+        if(isalpha(str[0]) || str[0] == '_') {
             size_t len = 0;
             {
                 char[] q = str;
-                while(isalnum(q[0])) {
+                while(is_iden_char(q[0])) {
                     ++len;
                     q = q[1 .. $];
                 }
@@ -159,4 +159,26 @@ Token* tokenize(char[] str)
 
     new_token(TokenKind.EOF, cur, str[$ .. $]);
     return head.next;
+}
+
+
+// 文字列の先頭が予約語で始まっているか？
+bool starts_with_reserved(char[] str, string reserved)
+{
+    if(str.length < reserved.length) return false;
+    if(str == reserved) return true;
+    if(str[0 .. reserved.length] != reserved)
+        return false;
+
+    auto rem = str[reserved.length .. $];
+    if(is_iden_char(rem[0]))
+        return false;
+    else
+        return true;
+}
+
+
+bool is_iden_char(char c)
+{
+    return isalnum(c) || c == '_';
 }
