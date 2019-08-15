@@ -84,4 +84,7 @@ unittest
 
         a + b;
     }, 9));
+    assert(test("b=0; for(a=1;a<10;a=a+1) { if(a > 5) b = b + a; } b;", 30));
+    assert(test("a=0; for(;a<10;) { a = a + 1; } a;", 10));
+    assert(test("c=0; for(a=0;a<3;a=a+1) { for(b=0;b<3;b=b+1) c = c + 1; } for(a=0;a<10;a=a+1) {} a+c;", 19));
 }

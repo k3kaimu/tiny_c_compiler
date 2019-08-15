@@ -28,9 +28,10 @@ int Main(FILE* fp, int argc, char** argv)
         gen_llvm_ir_def_lvars(fp, node);
 
     int val_cnt = 0;
+    int loop_cnt = 0;
 
     foreach(node; codes)
-        gen_llvm_ir_stmt(fp, node, &val_cnt);
+        gen_llvm_ir_stmt(fp, node, &val_cnt, &loop_cnt);
 
     fprintf(fp, "  ret i32 %%%d\n", val_cnt);
     fprintf(fp, "}\n");

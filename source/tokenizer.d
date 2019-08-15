@@ -12,6 +12,7 @@ enum TokenKind
     RETURN,         // return
     IF,             // if
     ELSE,           // else
+    FOR,            // for
     IDENT,          // 識別子
     NUM,            // 整数トークン
     EOF,            // 入力の終わりを表すトークン
@@ -133,6 +134,12 @@ Token* tokenize(char[] str)
         // else
         if(size_t len = starts_with_reserved(str, "else")) {
             cur = new_token(TokenKind.ELSE, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "for")) {
+            cur = new_token(TokenKind.FOR, cur, str[0 .. len]);
             str = str[len .. $];
             continue;
         }

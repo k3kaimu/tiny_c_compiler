@@ -22,6 +22,7 @@ enum NodeKind
     RETURN,     // return
     IF,         // if
     IFELSE,     // if-else
+    FOR,        // for
 }
 
 
@@ -37,6 +38,10 @@ struct Node
     Node* cond;
     Node* thenblock;
     Node* elseblock;
+
+    // for(init_expr; cond; update_expr) thenblock
+    Node* init_expr;
+    Node* update_expr;
 
     // block { stmt* }
     Node*[] stmts;
@@ -83,6 +88,7 @@ Node*[] program()
 //      | "{" stmt* "}"
 //      | "return" expr ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
+//      | "for" "(" expr? ";" expr? ";" expr? ")" stmt
 Node* stmt()
 {
     if(consume_reserved("{")) {
@@ -111,6 +117,33 @@ Node* stmt()
             node.kind = NodeKind.IFELSE;
             node.elseblock = stmt();
         }
+
+        return node;
+    }
+
+    if(consume(TokenKind.FOR)) {
+        expect("(");
+        Node* node = new Node;
+        node.kind = NodeKind.FOR;
+        if(!consume_reserved(";")) {
+            node.init_expr = expr();
+            expect(";");
+        }
+
+        if(!consume_reserved(";")) {
+            node.cond = expr();
+            expect(";");
+        }
+
+        if(!consume_reserved(")")) {
+            node.update_expr = expr();
+            expect(")");
+        }
+
+        node.thenblock = stmt();
+
+        if(node.cond is null)
+            node.cond = new_node_num(1);
 
         return node;
     }
