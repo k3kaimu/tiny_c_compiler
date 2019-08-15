@@ -22,7 +22,7 @@ enum NodeKind
     RETURN,     // return
     IF,         // if
     IFELSE,     // if-else
-    FOR,        // for
+    FOR,        // for, while
     BREAK,      // break
 }
 
@@ -91,6 +91,7 @@ Node*[] program()
 //      | "break" ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "for" "(" expr? ";" expr? ";" expr? ")" stmt
+//      | "while" "(" expr ")" stmt
 Node* stmt()
 {
     if(consume_reserved("{")) {
@@ -147,6 +148,16 @@ Node* stmt()
         if(node.cond is null)
             node.cond = new_node_num(1);
 
+        return node;
+    }
+
+    if(consume(TokenKind.WHILE)) {
+        Node* node = new Node;
+        node.kind = NodeKind.FOR;
+        expect("(");
+        node.cond = expr();
+        expect(")");
+        node.thenblock = stmt();
         return node;
     }
 

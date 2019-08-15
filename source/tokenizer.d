@@ -13,6 +13,7 @@ enum TokenKind
     IF,             // if
     ELSE,           // else
     FOR,            // for
+    WHILE,          // while
     BREAK,          // break
     IDENT,          // 識別子
     NUM,            // 整数トークン
@@ -141,6 +142,12 @@ Token* tokenize(char[] str)
 
         if(size_t len = starts_with_reserved(str, "for")) {
             cur = new_token(TokenKind.FOR, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "while")) {
+            cur = new_token(TokenKind.WHILE, cur, str[0 .. len]);
             str = str[len .. $];
             continue;
         }

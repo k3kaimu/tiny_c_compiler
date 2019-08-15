@@ -106,4 +106,7 @@ unittest
         }
         c;
     }, 30));
+    assert(test("a=0; for(;;){ a = a+1; if(a >= 10) return a; } 20;", 10));
+    assert(test("a=0; while(a<10) { a = a+1; } a;", 10));
+    assert(test("a=0; while(1) { a = a+1; if(a >= 10) break; } a;", 10));
 }
