@@ -14,6 +14,8 @@ enum NodeKind
     LE,         // <=
     GT,         // >
     GE,         // >=
+    ASSIGN,     // =
+    LVAR,       // ローカル変数
     NUM,        // 整数
 }
 
@@ -23,7 +25,8 @@ struct Node
     NodeKind kind;
     Node* lhs;
     Node* rhs;
-    int val;    //  kindがNUMのときのみ使う
+    int val;        // kindがNUMのときのみ使う
+    Token* token;   // kindがIDENTのときのみ使う
 }
 
 
@@ -51,10 +54,42 @@ Node* new_node_num(int val)
 }
 
 
-// expr = equality
+// program = stmt*
+Node*[] program()
+{
+    Node*[] nodes;
+    int i = 0;
+    while(!at_eof())
+        nodes ~= stmt();
+
+    return nodes;
+}
+
+
+// stmt = expr ";"
+Node* stmt()
+{
+    Node* node = expr();
+    expect(";");
+    return node;
+}
+
+
+// expr = assign
 Node* expr()
 {
+    Node* node = assign();
+    return node;
+}
+
+
+// assign = equality ("=" assign)?
+Node* assign()
+{
     Node* node = equality();
+    if(consume("="))
+        node = new_node(NodeKind.ASSIGN, node, assign());
+
     return node;
 }
 
@@ -139,12 +174,19 @@ Node* unary()
 }
 
 
-// term = num | "(" expr ")"
+// term = num | iden | "(" expr ")"
 Node* term()
 {
     if(consume("(")) {
         Node* node = expr();
         expect(")");
+        return node;
+    }
+
+    if(Token* tok = consume_ident()) {
+        Node* node = new Node;
+        node.kind = NodeKind.LVAR;
+        node.token = tok;
         return node;
     }
 

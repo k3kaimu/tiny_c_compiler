@@ -6,7 +6,8 @@ import core.stdc.stdlib;
 
 char* user_input;   // 入力プログラム
 
-void error(char* loc, string fmt, ...) {
+void error_at(char* loc, string fmt, ...)
+{
     char* cfmt = toStringz(fmt);
     va_list ap;
     va_start(ap, cfmt);
@@ -15,6 +16,17 @@ void error(char* loc, string fmt, ...) {
     fprintf(stderr, "%s\n", user_input);
     fprintf(stderr, "%*s", cast(int)pos, "".toStringz);
     fprintf(stderr, "^ ");
+    vfprintf(stderr, cfmt, ap);
+    fprintf(stderr, "\n");
+    exit(1);
+}
+
+
+void error(string fmt, ...)
+{
+    char* cfmt = toStringz(fmt);
+    va_list ap;
+    va_start(ap, cfmt);
     vfprintf(stderr, cfmt, ap);
     fprintf(stderr, "\n");
     exit(1);

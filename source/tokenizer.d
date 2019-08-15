@@ -9,6 +9,7 @@ import core.stdc.string;
 enum TokenKind
 {
     RESERVED,    // 記号
+    IDENT,
     NUM,         // 整数トークン
     EOF,         // 入力の終わりを表すトークン
 }
@@ -19,8 +20,7 @@ struct Token
     TokenKind kind; // トークンの型
     Token *next;    // 次の入力トークン
     int val;        // kindがTK_NUMの場合，その数値
-    char* str;      // トークン文字列
-    int len;        // トークンの長さ
+    char[] str;
 }
 
 
@@ -31,9 +31,7 @@ Token* token;       // 現在着目しているトークン
 // 真を返す．それ以外の場合には偽を返す．
 bool consume(string op)
 {
-    if(token.kind != TokenKind.RESERVED
-        || op.length != token.len
-        || memcmp(token.str, op.ptr, token.len))
+    if(token.kind != TokenKind.RESERVED || op != token.str)
         return false;
 
     token = token.next;
@@ -45,10 +43,8 @@ bool consume(string op)
 // それ以外の場合にはエラーを報告する．
 void expect(string op)
 {
-    if(token.kind != TokenKind.RESERVED
-        || op.length != token.len
-        || memcmp(token.str, op.ptr, token.len))
-        error(token.str, "'%c'ではありません", op.toStringz);
+    if(token.kind != TokenKind.RESERVED || op != token.str)
+        error_at(token.str.ptr, "'%.*s'ではありません", op.length, op.ptr);
 
     token = token.next;
 }
@@ -58,7 +54,7 @@ void expect(string op)
 // それ以外の場合にはエラーを報告する．
 int expect_number() {
     if(token.kind != TokenKind.NUM)
-        error(token.str, "数ではありません");
+        error_at(token.str.ptr, "数ではありません");
 
     int val = token.val;
     token = token.next;
@@ -72,13 +68,23 @@ bool at_eof()
 }
 
 
+Token* consume_ident()
+{
+    if(token.kind != TokenKind.IDENT)
+        return null;
+
+    auto tok = token;
+    token = token.next;
+    return tok;
+}
+
+
 // 新しいトークンを作成してcurにつなげる
 Token* new_token(TokenKind kind, Token* cur, char* str, int len)
 {
     Token* tok = new Token;
     tok.kind = kind;
-    tok.str = str;
-    tok.len = len;
+    tok.str = str[0 .. len];
     cur.next = tok;
     return tok;
 }
@@ -105,7 +111,25 @@ Token* tokenize(char* p)
             }
         }
 
+        if('a' <= *p && *p <= 'z') {
+            cur = new_token(TokenKind.IDENT, cur, p, 1);
+            ++p;
+            continue;
+        }
+
         if(*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')' || *p == '>' || *p == '<') {
+            cur = new_token(TokenKind.RESERVED, cur, p, 1);
+            ++p;
+            continue;
+        }
+
+        if(*p == '=') {
+            cur = new_token(TokenKind.RESERVED, cur, p, 1);
+            ++p;
+            continue;
+        }
+
+        if(*p == ';') {
             cur = new_token(TokenKind.RESERVED, cur, p, 1);
             ++p;
             continue;
@@ -120,7 +144,7 @@ Token* tokenize(char* p)
             continue;
         }
 
-        error(p, "トークナイズできません");
+        error_at(p, "トークナイズできません");
     }
 
     new_token(TokenKind.EOF, cur, p, 0);
