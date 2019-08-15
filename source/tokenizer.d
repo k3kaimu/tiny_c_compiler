@@ -144,13 +144,11 @@ Token* tokenize(char[] str)
         }
 
         if(isdigit(str[0])) {
-            char* p = str.ptr;
-            char* q = p;
-            int val = cast(int) strtol(q, &q, 10);
-            int len = cast(int)(q - p);
-            cur = new_token(TokenKind.NUM, cur, str[0 .. len]);
+            size_t lit_len;
+            int val = get_int_literal_value(str, lit_len);
+            cur = new_token(TokenKind.NUM, cur, str[0 .. lit_len]);
             cur.val = val;
-            str = str[len .. $];
+            str = str[lit_len .. $];
             continue;
         }
 
@@ -181,4 +179,33 @@ bool starts_with_reserved(char[] str, string reserved)
 bool is_iden_char(char c)
 {
     return isalnum(c) || c == '_';
+}
+
+
+int get_int_literal_value(const(char)[] str, ref size_t len)
+{
+    len = 0;
+    int val = 0;
+    while(str.length && isdigit(str[0])) {
+        ++len;
+        val *= 10;
+        val += (str[0] - '0');
+        str = str[1 .. $];
+    }
+
+    if(len == 0)
+        error("数値リテラルではありません");
+
+    return val;
+}
+
+unittest
+{
+    size_t len;
+    string s = "123 ";
+    assert(get_int_literal_value(s, len) == 123);
+    assert(s[len .. $] == " ");
+    s = "1_ 123";
+    assert(get_int_literal_value(s, len) == 1);
+    assert(s[len .. $] == "_ 123");
 }
