@@ -8,10 +8,10 @@ import core.stdc.string;
 
 enum TokenKind
 {
-    RESERVED,    // 記号
-    IDENT,
-    NUM,         // 整数トークン
-    EOF,         // 入力の終わりを表すトークン
+    RESERVED,       // 記号
+    IDENT,          // 識別子
+    NUM,            // 整数トークン
+    EOF,            // 入力の終わりを表すトークン
 }
 
 
