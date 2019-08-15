@@ -30,7 +30,7 @@ int Main(FILE* fp, int argc, char** argv)
     int val_cnt = 0;
 
     foreach(node; codes)
-        gen_llvm_ir_expr(fp, node, &val_cnt);
+        gen_llvm_ir_stmt(fp, node, &val_cnt);
 
     fprintf(fp, "  ret i32 %%%d\n", val_cnt);
     fprintf(fp, "}\n");

@@ -59,4 +59,7 @@ unittest
     assert(test("_=1; __=2; _a=3; a_b=4; _+__+_a+a_b;", 10));
     assert(test("return 1;", 1));
     assert(test("a = 12; return a+a; a+2;", 24));
+    assert(test("a = 1; if(1 == 1) a = 4; a;", 4));
+    assert(test("a = 1; if(1 == 1) a = 4; else a = 8; a;", 4));
+    assert(test("a=1; b=2; if(1 == 0) b = 0; else a = 8; a+b;", 10));
 }

@@ -10,6 +10,8 @@ enum TokenKind
 {
     RESERVED,       // 記号
     RETURN,         // return
+    IF,             // if
+    ELSE,           // else
     IDENT,          // 識別子
     NUM,            // 整数トークン
     EOF,            // 入力の終わりを表すトークン
@@ -114,8 +116,23 @@ Token* tokenize(char[] str)
             continue;
         }
 
+        // return
         if(size_t len = starts_with_reserved(str, "return")) {
             cur = new_token(TokenKind.RETURN, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        // if
+        if(size_t len = starts_with_reserved(str, "if")) {
+            cur = new_token(TokenKind.IF, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        // else
+        if(size_t len = starts_with_reserved(str, "else")) {
+            cur = new_token(TokenKind.ELSE, cur, str[0 .. len]);
             str = str[len .. $];
             continue;
         }

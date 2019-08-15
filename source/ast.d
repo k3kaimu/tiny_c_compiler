@@ -17,7 +17,10 @@ enum NodeKind
     ASSIGN,     // =
     LVAR,       // ローカル変数
     NUM,        // 整数
+    EXPR_STMT,  // 式文
     RETURN,     // return
+    IF,         // if
+    IFELSE,     // if-else
 }
 
 
@@ -28,6 +31,11 @@ struct Node
     Node* rhs;
     int val;        // kindがNUMのときのみ使う
     Token* token;   // kindがIDENTのときのみ使う
+
+    // if, if-else
+    Node* cond;
+    Node* thenblock;
+    Node* elseblock;
 }
 
 
@@ -67,16 +75,35 @@ Node*[] program()
 }
 
 
-// stmt = expr ";" | "return" expr ";"
+// stmt = expr ";"
+//      | "return" expr ";"
+//      | "if" "(" expr ")" stmt ("else" stmt)?
 Node* stmt()
 {
+    if(consume(TokenKind.IF)) {
+        expect("(");
+        Node* node = new Node;
+        node.kind = NodeKind.IF;
+        node.cond = expr();
+        expect(")");
+        node.thenblock = stmt();
+        if(consume(TokenKind.ELSE)) {
+            node.kind = NodeKind.IFELSE;
+            node.elseblock = stmt();
+        }
+
+        return node;
+    }
+
     Node* node;
     if(consume(TokenKind.RETURN)) {
         node = new Node;
         node.kind = NodeKind.RETURN;
         node.lhs = expr();
     } else {
-        node = expr();
+        node = new Node;
+        node.kind = NodeKind.EXPR_STMT;
+        node.lhs = expr();
     }
 
     expect(";");
