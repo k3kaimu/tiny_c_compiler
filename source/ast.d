@@ -17,6 +17,7 @@ enum NodeKind
     ASSIGN,     // =
     LVAR,       // ローカル変数
     NUM,        // 整数
+    RETURN,     // return
 }
 
 
@@ -66,10 +67,18 @@ Node*[] program()
 }
 
 
-// stmt = expr ";"
+// stmt = expr ";" | "return" expr ";"
 Node* stmt()
 {
-    Node* node = expr();
+    Node* node;
+    if(consume(TokenKind.RETURN)) {
+        node = new Node;
+        node.kind = NodeKind.RETURN;
+        node.lhs = expr();
+    } else {
+        node = expr();
+    }
+
     expect(";");
     return node;
 }
@@ -87,7 +96,7 @@ Node* expr()
 Node* assign()
 {
     Node* node = equality();
-    if(consume("="))
+    if(consume_reserved("="))
         node = new_node(NodeKind.ASSIGN, node, assign());
 
     return node;
@@ -100,9 +109,9 @@ Node* equality()
     Node* node = relational();
 
     while(1) {
-        if(consume("=="))
+        if(consume_reserved("=="))
             node = new_node(NodeKind.EQ, node, relational());
-        else if(consume("!="))
+        else if(consume_reserved("!="))
             node = new_node(NodeKind.NE, node, relational());
         else
             return node;
@@ -116,13 +125,13 @@ Node* relational()
     Node* node = add();
 
     while(1) {
-        if(consume("<"))
+        if(consume_reserved("<"))
             node = new_node(NodeKind.LT, node, add());
-        else if(consume("<="))
+        else if(consume_reserved("<="))
             node = new_node(NodeKind.LE, node, add());
-        else if(consume(">"))
+        else if(consume_reserved(">"))
             node = new_node(NodeKind.GT, node, add());
-        else if(consume(">="))
+        else if(consume_reserved(">="))
             node = new_node(NodeKind.GE, node, add());
         else
             return node;
@@ -136,9 +145,9 @@ Node* add()
     Node* node = mul();
 
     while(1) {
-        if(consume("+"))
+        if(consume_reserved("+"))
             node = new_node(NodeKind.ADD, node, mul());
-        else if(consume("-"))
+        else if(consume_reserved("-"))
             node = new_node(NodeKind.SUB, node, mul());
         else
             return node;
@@ -152,9 +161,9 @@ Node* mul()
     Node* node = unary();
 
     while(1) {
-        if(consume("*"))
+        if(consume_reserved("*"))
             node = new_node(NodeKind.MUL, node, unary());
-        else if(consume("/"))
+        else if(consume_reserved("/"))
             node = new_node(NodeKind.DIV, node, unary());
         else
             return node;
@@ -165,9 +174,9 @@ Node* mul()
 // unary = ("+" | "-")? term
 Node* unary()
 {
-    if(consume("+"))
+    if(consume_reserved("+"))
         return term;
-    else if(consume("-"))
+    else if(consume_reserved("-"))
         return new_node(NodeKind.SUB, new_node_num(0), term());
     else
         return term();
@@ -177,7 +186,7 @@ Node* unary()
 // term = num | iden | "(" expr ")"
 Node* term()
 {
-    if(consume("(")) {
+    if(consume_reserved("(")) {
         Node* node = expr();
         expect(")");
         return node;

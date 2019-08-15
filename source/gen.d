@@ -110,6 +110,11 @@ int gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             ++*val_cnt;
             fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n", *val_cnt, lhs_name.length, lhs_name.ptr);
             break;
+        case NodeKind.RETURN:
+            int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            fprintf(fp, "  ret i32 %%%d\n", *val_cnt);
+            ++*val_cnt;     // ret命令はBasic Blockを作るので，そのラベルを回避する
+            break;
         default:
             fprintf(stderr, "サポートしていないノードの種類です\n");
             exit(1);

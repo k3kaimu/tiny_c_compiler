@@ -9,6 +9,7 @@ import core.stdc.string;
 enum TokenKind
 {
     RESERVED,       // 記号
+    RETURN,         // return
     IDENT,          // 識別子
     NUM,            // 整数トークン
     EOF,            // 入力の終わりを表すトークン
@@ -29,9 +30,19 @@ Token* token;       // 現在着目しているトークン
 
 // 次のトークンが期待している記号のときには，トークンを1つ読み進めて
 // 真を返す．それ以外の場合には偽を返す．
-bool consume(string op)
+bool consume_reserved(string op)
 {
     if(token.kind != TokenKind.RESERVED || op != token.str)
+        return false;
+
+    token = token.next;
+    return true;
+}
+
+
+bool consume(TokenKind kind)
+{
+    if(token.kind != kind)
         return false;
 
     token = token.next;
@@ -103,6 +114,12 @@ Token* tokenize(char[] str)
             continue;
         }
 
+        if(size_t len = starts_with_reserved(str, "return")) {
+            cur = new_token(TokenKind.RETURN, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
         if(str.length >= 2) {
             if(str[0 .. 2] == "==" || str[0 .. 2] == "!=" || str[0 .. 2] == "<=" || str[0 .. 2] == ">=") {
                 cur = new_token(TokenKind.RESERVED, cur, str[0 .. 2]);
@@ -161,7 +178,7 @@ Token* tokenize(char[] str)
 
 
 // 文字列の先頭が予約語で始まっているか？
-bool starts_with_reserved(char[] str, string reserved)
+size_t starts_with_reserved(const(char)[] str, string reserved)
 {
     if(str.length < reserved.length) return false;
     if(str == reserved) return true;
@@ -170,9 +187,9 @@ bool starts_with_reserved(char[] str, string reserved)
 
     auto rem = str[reserved.length .. $];
     if(is_iden_char(rem[0]))
-        return false;
+        return 0;
     else
-        return true;
+        return reserved.length;
 }
 
 
