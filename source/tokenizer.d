@@ -80,7 +80,7 @@ Token* consume_ident()
 
 
 // 新しいトークンを作成してcurにつなげる
-Token* new_token(TokenKind kind, Token* cur, char* str, int len)
+Token* new_token(TokenKind kind, Token* cur, char* str, size_t len)
 {
     Token* tok = new Token;
     tok.kind = kind;
@@ -111,9 +111,17 @@ Token* tokenize(char* p)
             }
         }
 
-        if('a' <= *p && *p <= 'z') {
-            cur = new_token(TokenKind.IDENT, cur, p, 1);
-            ++p;
+        if(isalpha(*p)) {
+            size_t len = 0;
+            {
+                char* q = p;
+                while(isalnum(*q)) {
+                    ++len;
+                    ++q;
+                }
+            }
+            cur = new_token(TokenKind.IDENT, cur, p, len);
+            p += len;
             continue;
         }
 
