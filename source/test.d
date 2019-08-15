@@ -6,25 +6,42 @@ void main()
 {
 }
 
+
+auto execute_lli(string ir)
+{
+    File file = File("tmp.ll", "w");
+    file.write(ir);
+    file.flush();
+
+    auto lli = execute(["lli", file.name]);
+    return lli;
+}
+
+
+auto get_ir(string code)
+{
+    File file = File.tmpfile();
+    auto args = ["./tbc", code];
+    auto cargs = args.map!(a => cast(char*)a.toStringz).array;
+
+    Main(file.getFP, cast(int)args.length, cargs.ptr);
+    file.flush();
+    file.rewind;
+
+    string ir;
+    while(! file.eof)
+        ir ~= file.readln();
+
+    return ir;
+}
+
+
 unittest
 {
     bool test(string input, int expected) {
-        string filename = "tmp.ll";
-        File file = File(filename, "w");
-        auto args = ["./tbc", input];
-        auto cargs = args.map!(a => cast(char*)a.toStringz).array;
-
-        Main(file.getFP, cast(int)args.length, cargs.ptr);
-        file.flush();
-        auto lli = execute(["lli", filename]);
-
-        if(lli.status == expected)
-            return true;
-        else{
-            import std.stdio;
-            writefln("Output: %s, Expected: %s", lli.status, expected);
-            return false;
-        }
+        auto ir = get_ir(input);
+        auto status = execute_lli(ir).status;
+        return status == expected;
     }
 
     assert(test("0;", 0));
@@ -109,4 +126,22 @@ unittest
     assert(test("a=0; for(;;){ a = a+1; if(a >= 10) return a; } 20;", 10));
     assert(test("a=0; while(a<10) { a = a+1; } a;", 10));
     assert(test("a=0; while(1) { a = a+1; if(a >= 10) break; } a;", 10));
+}
+
+// 関数呼び出しのテスト
+unittest
+{
+    bool test_arg0(string input, int expected)
+    {
+        auto ir = get_ir(input);
+        ir ~= "\n";
+        ir ~= "define i32 @foo() {\n";
+        ir ~= "  ret i32 12\n";
+        ir ~= "}\n";
+
+        return execute_lli(ir).status == expected;
+    }
+
+    assert(test_arg0("foo();", 12));
+    assert(test_arg0("foo() + foo() + 3;", 27));
 }

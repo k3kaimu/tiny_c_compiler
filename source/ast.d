@@ -17,6 +17,7 @@ enum NodeKind
     ASSIGN,     // =
     LVAR,       // ローカル変数
     NUM,        // 整数
+    FUNC_CALL,  // 関数呼び出し
     EXPR_STMT,  // 式文
     BLOCK,      // block { stmt* }
     RETURN,     // return
@@ -46,6 +47,8 @@ struct Node
 
     // block { stmt* }
     Node*[] stmts;
+
+    Node*[] args;   // kindがFUNC_CALLのときのみ使う
 }
 
 
@@ -283,7 +286,9 @@ Node* unary()
 }
 
 
-// term = num | iden | "(" expr ")"
+// term = num
+//      | iden ( "("  ")" )?
+//      | "(" expr ")"
 Node* term()
 {
     if(consume_reserved("(")) {
@@ -293,10 +298,21 @@ Node* term()
     }
 
     if(Token* tok = consume_ident()) {
-        Node* node = new Node;
-        node.kind = NodeKind.LVAR;
-        node.token = tok;
-        return node;
+        if(consume_reserved("(")) {
+            expect(")");
+            // 関数呼び出し
+            Node* node = new Node;
+            node.kind = NodeKind.FUNC_CALL;
+            node.token = tok;
+            node.args = null;
+            return node;
+        } else {
+            // 変数
+            Node* node = new Node;
+            node.kind = NodeKind.LVAR;
+            node.token = tok;
+            return node;
+        }
     }
 
     return new_node_num(expect_number());

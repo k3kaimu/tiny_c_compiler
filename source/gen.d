@@ -242,6 +242,10 @@ int gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             ++*val_cnt;
             fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n", *val_cnt, node.token.str.length, node.token.str.ptr);
             break;
+        case NodeKind.FUNC_CALL:
+            ++*val_cnt;
+            fprintf(fp, "  %%%d = call i32 @%.*s()\n", *val_cnt, node.token.str.length, node.token.str.ptr);
+            break;
         case NodeKind.ASSIGN:
             char[] lhs_name = gen_llvm_ir_expr_lval(fp, node.lhs, val_cnt);
             int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
