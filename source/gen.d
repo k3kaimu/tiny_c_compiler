@@ -7,33 +7,65 @@ import core.stdc.stdio;
 import core.stdc.stdlib;
 
 
-char[][] lvar_names;
+void gen_llvm_ir_def_func(FILE* fp, Node* node)
+{
+    fprintf(fp, "define i32 @%.*s(", node.token.str.length, node.token.str.ptr);
+    foreach(i, e; node.func_def_args) {
+        fprintf(fp, "i32");
+        if(i != node.func_def_args.length - 1)
+            fprintf(fp, ", ");
+    }
+    fprintf(fp, ") {\n");
+    fprintf(fp, "entry:\n");
 
-void gen_llvm_ir_def_lvars(FILE* fp, Node* node)
+    char[][] lvar_defined;
+
+    foreach(i, e; node.func_def_args) {
+        fprintf(fp, "  %%%.*s = alloca i32\n", e.str.length, e.str.ptr);
+        fprintf(fp, "  store i32 %%%d, i32* %%%.*s\n", i, e.str.length, e.str.ptr);
+        lvar_defined ~= e.str;
+    }
+
+    foreach(e; node.func_def_body)
+        gen_llvm_ir_def_lvars(fp, e, lvar_defined);
+
+    int loop_cnt = 0;
+    int var_cnt = cast(int)node.func_def_args.length;
+    var_cnt -= 1;
+
+    foreach(e; node.func_def_body)
+        gen_llvm_ir_stmt(fp, e, &var_cnt, &loop_cnt);
+
+    fprintf(fp, "  ret i32 -1\n");
+
+    fprintf(fp, "}\n");
+}
+
+void gen_llvm_ir_def_lvars(FILE* fp, Node* node, ref char[][] lvar_defined)
 {
     if(node is null)
         return;
 
     if(node.kind == NodeKind.LVAR) {
         // すでに定義されていないか探す
-        foreach(char[] name; lvar_names)
+        foreach(char[] name; lvar_defined)
             if(name == node.token.str)
                 return;
 
         fprintf(fp, "  %%%.*s = alloca i32\n", node.token.str.length, node.token.str.ptr);
-        lvar_names ~= node.token.str;
+        lvar_defined ~= node.token.str;
         return;
     }
 
-    gen_llvm_ir_def_lvars(fp, node.lhs);
-    gen_llvm_ir_def_lvars(fp, node.rhs);
-    gen_llvm_ir_def_lvars(fp, node.cond);
-    gen_llvm_ir_def_lvars(fp, node.thenblock);
-    gen_llvm_ir_def_lvars(fp, node.elseblock);
-    gen_llvm_ir_def_lvars(fp, node.init_expr);
-    gen_llvm_ir_def_lvars(fp, node.update_expr);
+    gen_llvm_ir_def_lvars(fp, node.lhs, lvar_defined);
+    gen_llvm_ir_def_lvars(fp, node.rhs, lvar_defined);
+    gen_llvm_ir_def_lvars(fp, node.cond, lvar_defined);
+    gen_llvm_ir_def_lvars(fp, node.thenblock, lvar_defined);
+    gen_llvm_ir_def_lvars(fp, node.elseblock, lvar_defined);
+    gen_llvm_ir_def_lvars(fp, node.init_expr, lvar_defined);
+    gen_llvm_ir_def_lvars(fp, node.update_expr, lvar_defined);
     foreach(s; node.stmts)
-        gen_llvm_ir_def_lvars(fp, s);
+        gen_llvm_ir_def_lvars(fp, s, lvar_defined);
 }
 
 
@@ -244,7 +276,7 @@ int gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             break;
         case NodeKind.FUNC_CALL:
             int[] arg_ids;
-            foreach(arg; node.args) {
+            foreach(arg; node.func_call_args) {
                 arg_ids ~= gen_llvm_ir_expr(fp, arg, val_cnt);
             }
 

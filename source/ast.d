@@ -1,6 +1,7 @@
 extern(C):
 
 import tokenizer;
+import utils;
 
 enum NodeKind
 {
@@ -25,6 +26,7 @@ enum NodeKind
     IFELSE,     // if-else
     FOR,        // for, while
     BREAK,      // break
+    FUNC_DEF,   // 関数定義
 }
 
 
@@ -48,7 +50,11 @@ struct Node
     // block { stmt* }
     Node*[] stmts;
 
-    Node*[] args;   // kindがFUNC_CALLのときのみ使う
+    Node*[] func_call_args;   // kindがFUNC_CALLのときのみ使う
+
+    // func(args) func_body
+    Token*[] func_def_args;
+    Node*[] func_def_body;
 }
 
 
@@ -76,15 +82,54 @@ Node* new_node_num(int val)
 }
 
 
-// program = stmt*
+// program = func_def*
 Node*[] program()
 {
     Node*[] nodes;
     int i = 0;
     while(!at_eof())
-        nodes ~= stmt();
+        nodes ~= func_def();
 
     return nodes;
+}
+
+
+// func_def = iden "(" (iden ("," iden)* ","?)? ")" "{" stmt* "}"
+Node* func_def()
+{
+    Node* node = new Node;
+    node.kind = NodeKind.FUNC_DEF;
+
+    Token* func_name = consume_ident();
+    if(func_name is null)
+        error("関数定義ではありません");
+
+    node.token = func_name;
+
+    expect("(");
+    if(consume_reserved(")"))
+        goto Lbody;
+
+    node.func_def_args ~= consume_ident();
+    if(node.func_def_args[0] is null)
+        error("関数%.*sの第1引数は識別子ではありません", func_name.str.length, func_name.str.ptr);
+
+    while(!consume_reserved(")")) {
+        expect(",");
+        if(consume_reserved(")"))
+            break;
+
+        node.func_def_args ~= consume_ident();
+        if(node.func_def_args[$-1] is null)
+            error("関数%.*sの第%d引数は識別子ではありません", func_name.str.length, func_name.str.ptr, node.func_def_args.length);
+    }
+
+  Lbody:
+    expect("{");
+    while(!consume_reserved("}"))
+        node.func_def_body ~= stmt();
+
+    return node;
 }
 
 
@@ -308,14 +353,14 @@ Node* term()
             if(consume_reserved(")"))
                 return node;
 
-            node.args ~= expr();
+            node.func_call_args ~= expr();
 
             while(!consume_reserved(")")) {
                 expect(",");
                 if(consume_reserved(")"))
                     break;
 
-                node.args ~= expr();
+                node.func_call_args ~= expr();
             }
 
             return node;
