@@ -8,7 +8,7 @@ void main()
 
 unittest
 {
-    bool test(string input, int output) {
+    bool test(string input, int expected) {
         string filename = "tmp.ll";
         File file = File(filename, "w");
         auto args = ["./tbc", input];
@@ -17,7 +17,14 @@ unittest
         Main(file.getFP, cast(int)args.length, cargs.ptr);
         file.flush();
         auto lli = execute(["lli", filename]);
-        return lli.status == output;
+
+        if(lli.status == expected)
+            return true;
+        else{
+            import std.stdio;
+            writefln("Output: %s, Expected: %s", lli.status, expected);
+            return false;
+        }
     }
 
     assert(test("0;", 0));
@@ -87,4 +94,16 @@ unittest
     assert(test("b=0; for(a=1;a<10;a=a+1) { if(a > 5) b = b + a; } b;", 30));
     assert(test("a=0; for(;a<10;) { a = a + 1; } a;", 10));
     assert(test("c=0; for(a=0;a<3;a=a+1) { for(b=0;b<3;b=b+1) c = c + 1; } for(a=0;a<10;a=a+1) {} a+c;", 19));
+    assert(test("c=0; for(a=0;a<10;a=a+1) { c=c+1; if(a==3) break; } c;", 4));
+    assert(test(q{
+        c = 0;
+        for(a = 0; a < 10; a = a + 1) {
+            for(b = 0; b < 10; b = b + 1){
+                c = c + 1;
+                if(b == 2)
+                    break;
+            }
+        }
+        c;
+    }, 30));
 }

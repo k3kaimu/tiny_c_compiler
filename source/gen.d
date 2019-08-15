@@ -158,6 +158,10 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt)
         // fprintf(fp, "; <label>:%%%d:\n", next_block_id);
         fprintf(fp, "L%d.end:\n", this_loop_id);
         return;
+    } else if(node.kind == NodeKind.BREAK) {
+        fprintf(fp, "  br label %%L%d.end\n\n", *loop_cnt);
+        ++*val_cnt;
+        fprintf(fp, "; <label>:%%%d:\n", *val_cnt);
     } else {
         error("サポートしていない文です");
         return;
