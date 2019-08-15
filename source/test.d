@@ -63,4 +63,25 @@ unittest
     assert(test("a = 1; if(1 == 1) a = 4; else a = 8; a;", 4));
     assert(test("a=1; b=2; if(1 == 0) b = 0; else a = 8; a+b;", 10));
     assert(test("a=1; if(1 == 0) a=2; else if(1 == 0) a=3; else a=4; a;", 4));
+    assert(test("a=1;b=0; if(1 == 0) { a=2; b=3; } else { a=3; b=4; } a+b;", 7));
+    assert(test(q{
+        a = 2;
+        b = 2;
+        if(a == b) {
+            if(a == b) {
+                a = 4;
+                b = 4;
+
+                if(a == 3) {
+                    a = 7;
+                } else {
+                    a = 5;
+                }
+            } else {}
+        } else {
+
+        }
+
+        a + b;
+    }, 9));
 }

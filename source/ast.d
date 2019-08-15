@@ -18,6 +18,7 @@ enum NodeKind
     LVAR,       // ローカル変数
     NUM,        // 整数
     EXPR_STMT,  // 式文
+    BLOCK,      // block { stmt* }
     RETURN,     // return
     IF,         // if
     IFELSE,     // if-else
@@ -36,6 +37,9 @@ struct Node
     Node* cond;
     Node* thenblock;
     Node* elseblock;
+
+    // block { stmt* }
+    Node*[] stmts;
 }
 
 
@@ -76,10 +80,26 @@ Node*[] program()
 
 
 // stmt = expr ";"
+//      | "{" stmt* "}"
 //      | "return" expr ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 Node* stmt()
 {
+    if(consume_reserved("{")) {
+        Node*[] stmts;
+        while(1) {
+            if(consume_reserved("}"))
+                break;
+
+            stmts ~= stmt();
+        }
+
+        Node* node = new Node;
+        node.kind = NodeKind.BLOCK;
+        node.stmts = stmts;
+        return node;
+    }
+
     if(consume(TokenKind.IF)) {
         expect("(");
         Node* node = new Node;

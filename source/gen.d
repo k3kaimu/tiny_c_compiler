@@ -110,6 +110,10 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt)
     } else if(node.kind == NodeKind.EXPR_STMT) {
         gen_llvm_ir_expr(fp, node.lhs, val_cnt);
         return;
+    } else if(node.kind == NodeKind.BLOCK) {
+        foreach(stmt; node.stmts)
+            gen_llvm_ir_stmt(fp, stmt, val_cnt);
+        return;
     } else {
         error("サポートしていない文です");
         return;
