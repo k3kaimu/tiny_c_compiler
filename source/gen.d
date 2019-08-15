@@ -2,6 +2,7 @@ extern(C):
 
 import ast;
 import utils;
+import typesys;
 
 import core.stdc.stdio;
 import core.stdc.stdlib;
@@ -9,9 +10,13 @@ import core.stdc.stdlib;
 
 void gen_llvm_ir_def_func(FILE* fp, Node* node)
 {
-    fprintf(fp, "define i32 @%.*s(", node.token.str.length, node.token.str.ptr);
+    fprintf(fp, "define ");
+    gen_llvm_ir_type(fp, node.ret_type);
+    fprintf(fp, " @%.*s(", node.token.str.length, node.token.str.ptr);
+
     foreach(i, e; node.func_def_args) {
-        fprintf(fp, "i32");
+        // fprintf(fp, "i32");
+        gen_llvm_ir_type(fp, e.type);
         if(i != node.func_def_args.length - 1)
             fprintf(fp, ", ");
     }
@@ -21,9 +26,9 @@ void gen_llvm_ir_def_func(FILE* fp, Node* node)
     char[][] lvar_defined;
 
     foreach(i, e; node.func_def_args) {
-        fprintf(fp, "  %%%.*s = alloca i32\n", e.str.length, e.str.ptr);
-        fprintf(fp, "  store i32 %%%d, i32* %%%.*s\n", i, e.str.length, e.str.ptr);
-        lvar_defined ~= e.str;
+        gen_llvm_ir_alloca(fp, e);
+        gen_llvm_ir_store(fp, e, cast(int)i);
+        lvar_defined ~= e.token.str;
     }
 
     foreach(e; node.func_def_body)
@@ -334,4 +339,38 @@ char[] gen_llvm_ir_expr_lval(FILE* fp, Node* node, int* val_cnt)
     }
 
     return null;
+}
+
+
+void gen_llvm_ir_type(FILE* fp, Type* type)
+{
+    if(type.kind == TypeKind.POINTER) {
+        gen_llvm_ir_type(fp, type.nested);
+        fprintf(fp, "*");
+        return;
+    } else {
+        if(type.str == "int") {
+            fprintf(fp, "i32");
+            return;
+        } else
+            error("'%.*s': 不明な型です", type.str.length, type.str.ptr);
+    }
+}
+
+
+void gen_llvm_ir_alloca(FILE* fp, Variable v)
+{
+    fprintf(fp, "  %%%.*s = alloca ", v.token.str.length, v.token.str.ptr);
+    gen_llvm_ir_type(fp, v.type);
+    fprintf(fp, "\n");
+}
+
+
+void gen_llvm_ir_store(FILE* fp, Variable v, int reg_id)
+{
+    fprintf(fp, "  store ");
+    gen_llvm_ir_type(fp, v.type);
+    fprintf(fp, " %%%d, ", reg_id);
+    gen_llvm_ir_type(fp, v.type);
+    fprintf(fp, "* %%%.*s\n", v.token.str.length, v.token.str.ptr);
 }

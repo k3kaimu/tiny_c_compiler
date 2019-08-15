@@ -15,6 +15,7 @@ enum TokenKind
     FOR,            // for
     WHILE,          // while
     BREAK,          // break
+    INT,            // int
     IDENT,          // 識別子
     NUM,            // 整数トークン
     EOF,            // 入力の終わりを表すトークン
@@ -154,6 +155,12 @@ Token* tokenize(char[] str)
 
         if(size_t len = starts_with_reserved(str, "break")) {
             cur = new_token(TokenKind.BREAK, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "int")) {
+            cur = new_token(TokenKind.INT, cur, str[0 .. len]);
             str = str[len .. $];
             continue;
         }

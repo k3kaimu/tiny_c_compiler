@@ -2,6 +2,7 @@ extern(C):
 
 import tokenizer;
 import utils;
+import typesys;
 
 enum NodeKind
 {
@@ -27,6 +28,14 @@ enum NodeKind
     FOR,        // for, while
     BREAK,      // break
     FUNC_DEF,   // 関数定義
+    TYPE,       // 型
+}
+
+
+struct Variable
+{
+    Type* type;
+    Token* token;
 }
 
 
@@ -52,9 +61,12 @@ struct Node
 
     Node*[] func_call_args;   // kindがFUNC_CALLのときのみ使う
 
-    // func(args) func_body
-    Token*[] func_def_args;
+    // ret_type token.str(func_def_args) func_def_body
+    Type* ret_type;
+    Variable[] func_def_args;
     Node*[] func_def_body;
+
+    Type* type;                 // TYPE か exprのときのみ使う
 }
 
 
@@ -94,34 +106,43 @@ Node*[] program()
 }
 
 
-// func_def = iden "(" (iden ("," iden)* ","?)? ")" "{" stmt* "}"
+// func_def = type iden "(" (type iden ("," type iden)* ","?)? ")" "{" stmt* "}"
 Node* func_def()
 {
     Node* node = new Node;
     node.kind = NodeKind.FUNC_DEF;
-
+    node.ret_type = type().type;
     Token* func_name = consume_ident();
     if(func_name is null)
         error("関数定義ではありません");
 
     node.token = func_name;
 
+    Type* arg_type;
+    Token* arg_ident;
+
     expect("(");
     if(consume_reserved(")"))
         goto Lbody;
 
-    node.func_def_args ~= consume_ident();
-    if(node.func_def_args[0] is null)
+    arg_type = type().type;
+    arg_ident = consume_ident();
+    if(arg_ident is null)
         error("関数%.*sの第1引数は識別子ではありません", func_name.str.length, func_name.str.ptr);
+
+    node.func_def_args ~= Variable(arg_type, arg_ident);
 
     while(!consume_reserved(")")) {
         expect(",");
         if(consume_reserved(")"))
             break;
 
-        node.func_def_args ~= consume_ident();
-        if(node.func_def_args[$-1] is null)
-            error("関数%.*sの第%d引数は識別子ではありません", func_name.str.length, func_name.str.ptr, node.func_def_args.length);
+        arg_type = type().type;
+        arg_ident = consume_ident();
+        if(arg_ident is null)
+            error("関数%.*sの第%d引数は識別子ではありません", func_name.str.length, func_name.str.ptr, node.func_def_args.length + 1);
+
+        node.func_def_args ~= Variable(arg_type, arg_ident);
     }
 
   Lbody:
@@ -374,4 +395,45 @@ Node* term()
     }
 
     return new_node_num(expect_number());
+}
+
+
+// type = basic_type "*"*
+Node* type()
+{
+    Node* node = new Node;
+    node.kind = NodeKind.TYPE;
+
+    Type* ty = basic_type();
+    while(consume_reserved("*")) {
+        Type* new_ty = new Type;
+        new_ty.kind = TypeKind.POINTER;
+        new_ty.str = ty.str ~ "*";
+        new_ty.nested = ty;
+        ty = new_ty;
+    }
+
+    node.type = ty;
+    return node;
+}
+
+
+// basic_type = int | ident
+Type* basic_type()
+{
+    Type* ty = new Type;
+    ty.kind = TypeKind.BASE;
+
+    if(consume(TokenKind.INT)) {
+        ty.str = cast(char[])"int";
+        return ty;
+    }
+
+    if(Token* tok = consume_ident()) {
+        ty.str = tok.str;
+        return ty;
+    }
+
+    error_at(token.str.ptr, "型ではありません");
+    return null;
 }

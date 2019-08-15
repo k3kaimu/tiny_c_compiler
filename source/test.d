@@ -39,7 +39,7 @@ auto get_ir(string code)
 unittest
 {
     bool test(string input, int expected) {
-        auto ir = get_ir("main(){" ~ input ~ "}" );
+        auto ir = get_ir("int main(){" ~ input ~ "}" );
         auto status = execute_lli(ir).status;
         return status == expected;
     }
@@ -134,7 +134,7 @@ unittest
 {
     bool test_arg0(string input, int expected)
     {
-        auto ir = get_ir("main() { " ~ input ~ "}");
+        auto ir = get_ir("int main() { " ~ input ~ "}");
         ir ~= "\n";
         ir ~= "define i32 @foo() {\n";
         ir ~= "  ret i32 12\n";
@@ -149,7 +149,7 @@ unittest
 
     bool test_arg2(string input, int expected)
     {
-        auto ir = get_ir("main() { " ~ input ~ "}");
+        auto ir = get_ir("int main() { " ~ input ~ "}");
         ir ~= "\n";
         ir ~= "define i32 @foo(i32, i32) {\n";
         ir ~= "  %3 = add i32 %0, %1\n";
@@ -168,7 +168,7 @@ unittest
 {
     // フィボナッチ数列
     auto code = q{
-        fib(n) {
+        int fib(int n) {
             if(n == 0)
                 return 0;
             else if(n == 1)
@@ -177,7 +177,7 @@ unittest
                 return fib(n-1) + fib(n-2);
         }
 
-        main() {
+        int main() {
             return fib(12);
         }
     };
