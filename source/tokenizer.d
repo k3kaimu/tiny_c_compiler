@@ -198,7 +198,7 @@ Token* tokenize(char[] str)
             continue;
         }
 
-        if(str[0] == ';') {
+        if(str[0] == ';' || str[0] == ',') {
             cur = new_token(TokenKind.RESERVED, cur, str[0 .. 1]);
             str = str[1 .. $];
             continue;

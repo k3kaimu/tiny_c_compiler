@@ -144,4 +144,20 @@ unittest
 
     assert(test_arg0("foo();", 12));
     assert(test_arg0("foo() + foo() + 3;", 27));
+
+
+    bool test_arg2(string input, int expected)
+    {
+        auto ir = get_ir(input);
+        ir ~= "\n";
+        ir ~= "define i32 @foo(i32, i32) {\n";
+        ir ~= "  %3 = add i32 %0, %1\n";
+        ir ~= "  ret i32 %3\n";
+        ir ~= "}\n";
+
+        return execute_lli(ir).status == expected;
+    }
+
+    assert(test_arg2("foo(1, 2);", 3));
+    assert(test_arg2("foo(foo(1, 2), foo(3, 4)) + foo(1, 2) + 3;", 16));
 }

@@ -288,6 +288,7 @@ Node* unary()
 
 // term = num
 //      | iden ( "("  ")" )?
+//      | iden "(" expr ("," expr)* ","? ")"
 //      | "(" expr ")"
 Node* term()
 {
@@ -299,12 +300,24 @@ Node* term()
 
     if(Token* tok = consume_ident()) {
         if(consume_reserved("(")) {
-            expect(")");
             // 関数呼び出し
             Node* node = new Node;
             node.kind = NodeKind.FUNC_CALL;
             node.token = tok;
-            node.args = null;
+
+            if(consume_reserved(")"))
+                return node;
+
+            node.args ~= expr();
+
+            while(!consume_reserved(")")) {
+                expect(",");
+                if(consume_reserved(")"))
+                    break;
+
+                node.args ~= expr();
+            }
+
             return node;
         } else {
             // 変数
