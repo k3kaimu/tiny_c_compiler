@@ -34,12 +34,13 @@ void gen_llvm_ir_def_func(FILE* fp, Node* node)
     foreach(e; node.func_def_body)
         gen_llvm_ir_def_lvars(fp, e, lvar_defined);
 
+    int block_cnt = 0;
     int loop_cnt = 0;
     int var_cnt = cast(int)node.func_def_args.length;
     var_cnt -= 1;
 
     foreach(e; node.func_def_body)
-        gen_llvm_ir_stmt(fp, e, &var_cnt, &loop_cnt);
+        gen_llvm_ir_stmt(fp, e, &var_cnt, &loop_cnt, &block_cnt);
 
     fprintf(fp, "  ret i32 -1\n");
 
@@ -69,6 +70,7 @@ void gen_llvm_ir_def_lvars(FILE* fp, Node* node, ref char[][] lvar_defined)
     gen_llvm_ir_def_lvars(fp, node.elseblock, lvar_defined);
     gen_llvm_ir_def_lvars(fp, node.init_stmt, lvar_defined);
     gen_llvm_ir_def_lvars(fp, node.update_expr, lvar_defined);
+    gen_llvm_ir_def_lvars(fp, node.def_loop_var, lvar_defined);
     foreach(s; node.stmts)
         gen_llvm_ir_def_lvars(fp, s, lvar_defined);
 }
@@ -87,73 +89,34 @@ void concat_ir(FILE* fp, FILE* tmp)
 }
 
 
-FILE* gen_llvm_ir_stmt_block(Node* node, int* val_cnt, int* loop_cnt)
+void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* block_cnt)
 {
-    FILE* fp = tmpfile();
-    gen_llvm_ir_stmt(fp, node, val_cnt, loop_cnt);
-    fflush(fp);
-    return fp;
-}
+    if(node.kind == NodeKind.IF || node.kind == NodeKind.IFELSE) {
+        int this_block_id = ++*block_cnt;
 
-
-FILE* gen_llvm_ir_expr_block(Node* node, int* val_cnt)
-{
-    FILE* fp = tmpfile();
-    gen_llvm_ir_expr(fp, node, val_cnt);
-    fflush(fp);
-    return fp;
-}
-
-
-void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt)
-{
-    if(node.kind == NodeKind.IF) {
         int cond_id = gen_llvm_ir_expr(fp, node.cond, val_cnt);
         ++*val_cnt;
         fprintf(fp, "  %%%d = icmp ne i32 %%%d, 0\n", *val_cnt, cond_id);
         cond_id = *val_cnt;
 
-        ++*val_cnt;
-        int then_id = *val_cnt;
-        FILE* then_ir = gen_llvm_ir_stmt_block(node.thenblock, val_cnt, loop_cnt);
+        if(node.kind == NodeKind.IF) {  // if
+            fprintf(fp, "  br i1 %%%d, label %%BIF%d.then, label %%BIF%d.next\n\n", cond_id, this_block_id, this_block_id);
+        } else {                        // if-else
+            fprintf(fp, "  br i1 %%%d, label %%BIF%d.then, label %%BIF%d.else\n\n", cond_id, this_block_id, this_block_id);
+        }
 
-        ++*val_cnt;
-        int next_id = *val_cnt;
-        fprintf(fp, "  br i1 %%%d, label %%%d, label %%%d\n\n", cond_id, then_id, next_id);
+        fprintf(fp, "BIF%d.then:\n", this_block_id);
+        gen_llvm_ir_stmt(fp, node.thenblock, val_cnt, loop_cnt, block_cnt);
+        fprintf(fp, "  br label %%BIF%d.next\n\n", this_block_id);
 
-        fprintf(fp, "; <label>:%%%d:\n", then_id);
-        concat_ir(fp, then_ir);
-        fprintf(fp, "  br label %%%d\n\n", next_id);
+        if(node.kind == NodeKind.IFELSE) {
+            fprintf(fp, "BIF%d.else:\n", this_block_id);
+            gen_llvm_ir_stmt(fp, node.elseblock, val_cnt, loop_cnt, block_cnt);
+            fprintf(fp, "  br label %%BIF%d.next\n\n", this_block_id);
+        }
 
-        fprintf(fp, "; <label>:%%%d:\n", next_id);
-        return;
-    } else if(node.kind == NodeKind.IFELSE) {
-        int cond_id = gen_llvm_ir_expr(fp, node.cond, val_cnt);
-        ++*val_cnt;
-        fprintf(fp, "  %%%d = icmp ne i32 %%%d, 0\n", *val_cnt, cond_id);
-        cond_id = *val_cnt;
+        fprintf(fp, "BIF%d.next:\n", this_block_id);
 
-        ++*val_cnt;
-        int then_id = *val_cnt;
-        FILE* then_ir = gen_llvm_ir_stmt_block(node.thenblock, val_cnt, loop_cnt);
-
-        ++*val_cnt;
-        int else_id = *val_cnt;
-        FILE* else_ir = gen_llvm_ir_stmt_block(node.elseblock, val_cnt, loop_cnt);
-
-        ++*val_cnt;
-        int next_id = *val_cnt;
-        fprintf(fp, "  br i1 %%%d, label %%%d, label %%%d\n\n", cond_id, then_id, else_id);
-
-        fprintf(fp, "; <label>:%%%d:\n", then_id);
-        concat_ir(fp, then_ir);
-        fprintf(fp, "  br label %%%d\n\n", next_id);
-
-        fprintf(fp, "; <label>:%%%d:\n", else_id);
-        concat_ir(fp, else_ir);
-        fprintf(fp, "  br label %%%d\n\n", next_id);
-
-        fprintf(fp, "; <label>:%%%d:\n", next_id);
         return;
     } else if (node.kind == NodeKind.RETURN) {
         int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
@@ -165,38 +128,25 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt)
         return;
     } else if(node.kind == NodeKind.BLOCK) {
         foreach(stmt; node.stmts)
-            gen_llvm_ir_stmt(fp, stmt, val_cnt, loop_cnt);
+            gen_llvm_ir_stmt(fp, stmt, val_cnt, loop_cnt, block_cnt);
         return;
     } else if(node.kind == NodeKind.FOR) {
         int this_loop_id = ++*loop_cnt;
-        if(node.init_stmt !is null) gen_llvm_ir_stmt(fp, node.init_stmt, val_cnt, loop_cnt);
+        if(node.init_stmt !is null) gen_llvm_ir_stmt(fp, node.init_stmt, val_cnt, loop_cnt, block_cnt);
 
-        int cond_block_id = ++*val_cnt;
-        FILE* cond_ir = gen_llvm_ir_expr_block(node.cond, val_cnt);
-        int cond_val_id = *val_cnt;
-        int cond_val_bool_id = ++*val_cnt;
-
-        int then_block_id = ++*val_cnt;
-        FILE* then_ir = gen_llvm_ir_stmt_block(node.thenblock, val_cnt, loop_cnt);
-        if(node.update_expr !is null) gen_llvm_ir_expr(then_ir, node.update_expr, val_cnt);
-        fflush(then_ir);
-
-        // int next_block_id = ++*val_cnt;
-
-        fprintf(fp, "  br label %%%d\n\n", cond_block_id);
-        fprintf(fp, "; <label>:%%%d:\n", cond_block_id);
-        concat_ir(fp, cond_ir);
-        fprintf(fp, "  %%%d = icmp ne i32 %%%d, 0\n", cond_val_bool_id, cond_val_id);
-        // fprintf(fp, "  br i1 %%%d, label %%%d, label %%%d\n\n", cond_val_bool_id, then_block_id, next_block_id);
-        fprintf(fp, "  br i1 %%%d, label %%%d, label %%L%d.end\n\n", cond_val_bool_id, then_block_id, this_loop_id);
-        fprintf(fp, "; <label>:%%%d:\n", then_block_id);
-        concat_ir(fp, then_ir);
-        fprintf(fp, "  br label %%%d\n\n", cond_block_id);
-        // fprintf(fp, "; <label>:%%%d:\n", next_block_id);
-        fprintf(fp, "L%d.end:\n", this_loop_id);
+        fprintf(fp, "  br label %%LFOR%d.cond\n\n", this_loop_id);
+        fprintf(fp, "LFOR%d.cond:\n", this_loop_id);
+        int cond_val_id = gen_llvm_ir_expr(fp, node.cond, val_cnt);
+        fprintf(fp, "  %%%d = icmp ne i32 %%%d, 0\n", ++*val_cnt, cond_val_id);
+        fprintf(fp, "  br i1 %%%d, label %%LFOR%d.then, label %%LFOR%d.end\n\n", *val_cnt, this_loop_id, this_loop_id);
+        fprintf(fp, "LFOR%d.then:\n", this_loop_id);
+        gen_llvm_ir_stmt(fp, node.thenblock, val_cnt, loop_cnt, block_cnt);
+        if(node.update_expr !is null) gen_llvm_ir_expr(fp, node.update_expr, val_cnt);
+        fprintf(fp, "  br label %%LFOR%d.cond\n\n", this_loop_id);
+        fprintf(fp, "LFOR%d.end:\n", this_loop_id);
         return;
     } else if(node.kind == NodeKind.BREAK) {
-        fprintf(fp, "  br label %%L%d.end\n\n", *loop_cnt);
+        fprintf(fp, "  br label %%LFOR%d.end\n\n", *loop_cnt);
         ++*val_cnt;
         fprintf(fp, "; <label>:%%%d:\n", *val_cnt);
         return;
