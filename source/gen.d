@@ -51,14 +51,14 @@ void gen_llvm_ir_def_lvars(FILE* fp, Node* node, ref char[][] lvar_defined)
     if(node is null)
         return;
 
-    if(node.kind == NodeKind.LVAR) {
+    if(node.kind == NodeKind.LVAR_DEF) {
         // すでに定義されていないか探す
         foreach(char[] name; lvar_defined)
-            if(name == node.token.str)
+            if(name == node.def_var.token.str)
                 return;
 
-        fprintf(fp, "  %%%.*s = alloca i32\n", node.token.str.length, node.token.str.ptr);
-        lvar_defined ~= node.token.str;
+        gen_llvm_ir_alloca(fp, node.def_var);
+        lvar_defined ~= node.def_var.token.str;
         return;
     }
 
@@ -67,7 +67,7 @@ void gen_llvm_ir_def_lvars(FILE* fp, Node* node, ref char[][] lvar_defined)
     gen_llvm_ir_def_lvars(fp, node.cond, lvar_defined);
     gen_llvm_ir_def_lvars(fp, node.thenblock, lvar_defined);
     gen_llvm_ir_def_lvars(fp, node.elseblock, lvar_defined);
-    gen_llvm_ir_def_lvars(fp, node.init_expr, lvar_defined);
+    gen_llvm_ir_def_lvars(fp, node.init_stmt, lvar_defined);
     gen_llvm_ir_def_lvars(fp, node.update_expr, lvar_defined);
     foreach(s; node.stmts)
         gen_llvm_ir_def_lvars(fp, s, lvar_defined);
@@ -169,7 +169,7 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt)
         return;
     } else if(node.kind == NodeKind.FOR) {
         int this_loop_id = ++*loop_cnt;
-        if(node.init_expr !is null) gen_llvm_ir_expr(fp, node.init_expr, val_cnt);
+        if(node.init_stmt !is null) gen_llvm_ir_stmt(fp, node.init_stmt, val_cnt, loop_cnt);
 
         int cond_block_id = ++*val_cnt;
         FILE* cond_ir = gen_llvm_ir_expr_block(node.cond, val_cnt);
@@ -199,6 +199,13 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt)
         fprintf(fp, "  br label %%L%d.end\n\n", *loop_cnt);
         ++*val_cnt;
         fprintf(fp, "; <label>:%%%d:\n", *val_cnt);
+        return;
+    } else if(node.kind == NodeKind.LVAR_DEF) {
+        if(node.lhs !is null) {
+            int init_val_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            gen_llvm_ir_store(fp, node.def_var, init_val_id);
+        }
+        return;
     } else {
         error("サポートしていない文です");
         return;

@@ -6,30 +6,37 @@ import core.stdc.stdlib;
 
 char* user_input;   // 入力プログラム
 
+bool ignore_error = false;
+
 void error_at(char* loc, string fmt, ...)
 {
-    char* cfmt = toStringz(fmt);
-    va_list ap;
-    va_start(ap, cfmt);
+    if(!ignore_error) {
+        char* cfmt = toStringz(fmt);
+        va_list ap;
+        va_start(ap, cfmt);
 
-    ptrdiff_t pos = cast(ptrdiff_t)loc - cast(ptrdiff_t)user_input;
-    fprintf(stderr, "%s\n", user_input);
-    fprintf(stderr, "%*s", cast(int)pos, "".toStringz);
-    fprintf(stderr, "^ ");
-    vfprintf(stderr, cfmt, ap);
-    fprintf(stderr, "\n");
-    exit(1);
+        ptrdiff_t pos = cast(ptrdiff_t)loc - cast(ptrdiff_t)user_input;
+        fprintf(stderr, "%s\n", user_input);
+        fprintf(stderr, "%*s", cast(int)pos, "".toStringz);
+        fprintf(stderr, "^ ");
+        vfprintf(stderr, cfmt, ap);
+        fprintf(stderr, "\n");
+        exit(1);
+        // throw new Exception("");
+    }
 }
 
 
 void error(string fmt, ...)
 {
-    char* cfmt = toStringz(fmt);
-    va_list ap;
-    va_start(ap, cfmt);
-    vfprintf(stderr, cfmt, ap);
-    fprintf(stderr, "\n");
-    exit(1);
+    if(!ignore_error) {
+        char* cfmt = toStringz(fmt);
+        va_list ap;
+        va_start(ap, cfmt);
+        vfprintf(stderr, cfmt, ap);
+        fprintf(stderr, "\n");
+        exit(1);
+    }
 }
 
 

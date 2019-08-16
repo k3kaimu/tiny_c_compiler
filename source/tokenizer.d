@@ -34,6 +34,18 @@ struct Token
 Token* token;       // 現在着目しているトークン
 
 
+Token* save_tokenizer()
+{
+    return token;
+}
+
+
+void restore_tokenizer(Token* new_head)
+{
+    token = new_head;
+}
+
+
 // 次のトークンが期待している記号のときには，トークンを1つ読み進めて
 // 真を返す．それ以外の場合には偽を返す．
 bool consume_reserved(string op)

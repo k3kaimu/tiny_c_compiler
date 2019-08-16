@@ -77,20 +77,20 @@ unittest
     assert(test("return 0<=0;", 1));
     assert(test("return a=1;", 1));
     assert(test("return b=1;", 1));
-    assert(test("a=1;return b=a*2;", 2));
-    assert(test("a=1;b=a*2;return b=b*2;", 4));
-    assert(test("foo=1;bar=foo*2;return bar=bar*2;", 4));
-    assert(test("_=1; __=2; _a=3; a_b=4; return _+__+_a+a_b;", 10));
+    assert(test("int a=1; int b; return b=a*2;", 2));
+    assert(test("int a=1; int b=a*2;return b=b*2;", 4));
+    assert(test("int foo=1;int bar=foo*2;return bar=bar*2;", 4));
+    assert(test("int _=1; int __=2; int _a=3; int a_b=4; return _+__+_a+a_b;", 10));
     assert(test("return 1;", 1));
-    assert(test("a = 12; return a+a; a+2;", 24));
-    assert(test("a = 1; if(1 == 1) a = 4; return a;", 4));
-    assert(test("a = 1; if(1 == 1) a = 4; else a = 8; return a;", 4));
-    assert(test("a=1; b=2; if(1 == 0) b = 0; else a = 8; return a+b;", 10));
-    assert(test("a=1; if(1 == 0) a=2; else if(1 == 0) a=3; else a=4; return a;", 4));
-    assert(test("a=1;b=0; if(1 == 0) { a=2; b=3; } else { a=3; b=4; } return a+b;", 7));
+    assert(test("int a = 12; return a+a; a+2;", 24));
+    assert(test("int a = 1; if(1 == 1) a = 4; return a;", 4));
+    assert(test("int a = 1; if(1 == 1) a = 4; else a = 8; return a;", 4));
+    assert(test("int a=1; int b=2; if(1 == 0) b = 0; else a = 8; return a+b;", 10));
+    assert(test("int a=1; if(1 == 0) a=2; else if(1 == 0) a=3; else a=4; return a;", 4));
+    assert(test("int a=1; int b=0; if(1 == 0) { a=2; b=3; } else { a=3; b=4; } return a+b;", 7));
     assert(test(q{
-        a = 2;
-        b = 2;
+        int a = 2;
+        int b = 2;
         if(a == b) {
             if(a == b) {
                 a = 4;
@@ -108,14 +108,14 @@ unittest
 
         return a + b;
     }, 9));
-    assert(test("b=0; for(a=1;a<10;a=a+1) { if(a > 5) b = b + a; } return b;", 30));
-    assert(test("a=0; for(;a<10;) { a = a + 1; } return a;", 10));
-    assert(test("c=0; for(a=0;a<3;a=a+1) { for(b=0;b<3;b=b+1) c = c + 1; } for(a=0;a<10;a=a+1) {} return a+c;", 19));
-    assert(test("c=0; for(a=0;a<10;a=a+1) { c=c+1; if(a==3) break; } return c;", 4));
+    assert(test("int b=0; for(int a=1;a<10;a=a+1) { if(a > 5) b = b + a; } return b;", 30));
+    assert(test("int a=0; for(;a<10;) { a = a + 1; } return a;", 10));
+    assert(test("int c=0; for(int a=0;a<3;a=a+1) { for(int b=0;b<3;b=b+1) c = c + 1; } for(int a=0;a<10;a=a+1) {} return a+c;", 19));
+    assert(test("int c=0; for(int a=0;a<10;a=a+1) { c=c+1; if(a==3) break; } return c;", 4));
     assert(test(q{
-        c = 0;
-        for(a = 0; a < 10; a = a + 1) {
-            for(b = 0; b < 10; b = b + 1){
+        int c = 0;
+        for(int a = 0; a < 10; a = a + 1) {
+            for(int b = 0; b < 10; b = b + 1){
                 c = c + 1;
                 if(b == 2)
                     break;
@@ -123,9 +123,10 @@ unittest
         }
         return c;
     }, 30));
-    assert(test("a=0; for(;;){ a = a+1; if(a >= 10) return a; } 20;", 10));
-    assert(test("a=0; while(a<10) { a = a+1; } return a;", 10));
-    assert(test("a=0; while(1) { a = a+1; if(a >= 10) break; } return a;", 10));
+    assert(test("int a=0; for(;;){ a = a+1; if(a >= 10) return a; } 20;", 10));
+    assert(test("int a=0; while(a<10) { a = a+1; } return a;", 10));
+    assert(test("int a=0; while(1) { a = a+1; if(a >= 10) break; } return a;", 10));
+    assert(test("int a; a = 10; return a;", 10));
 }
 
 

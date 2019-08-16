@@ -29,6 +29,7 @@ enum NodeKind
     BREAK,      // break
     FUNC_DEF,   // 関数定義
     TYPE,       // 型
+    LVAR_DEF,   // ローカル変数定義
 }
 
 
@@ -52,8 +53,8 @@ struct Node
     Node* thenblock;
     Node* elseblock;
 
-    // for(init_expr; cond; update_expr) thenblock
-    Node* init_expr;
+    // for(init_stmt; cond; update_expr) thenblock
+    Node* init_stmt;
     Node* update_expr;
 
     // block { stmt* }
@@ -67,6 +68,7 @@ struct Node
     Node*[] func_def_body;
 
     Type* type;                 // TYPE か exprのときのみ使う
+    Variable def_var;           // kindがLVAR_DEFのときのみ使う
 }
 
 
@@ -113,8 +115,10 @@ Node* func_def()
     node.kind = NodeKind.FUNC_DEF;
     node.ret_type = type().type;
     Token* func_name = consume_ident();
-    if(func_name is null)
+    if(func_name is null) {
         error("関数定義ではありません");
+        return null;
+    }
 
     node.token = func_name;
 
@@ -127,8 +131,10 @@ Node* func_def()
 
     arg_type = type().type;
     arg_ident = consume_ident();
-    if(arg_ident is null)
+    if(arg_ident is null) {
         error("関数%.*sの第1引数は識別子ではありません", func_name.str.length, func_name.str.ptr);
+        return null;
+    }
 
     node.func_def_args ~= Variable(arg_type, arg_ident);
 
@@ -139,8 +145,10 @@ Node* func_def()
 
         arg_type = type().type;
         arg_ident = consume_ident();
-        if(arg_ident is null)
+        if(arg_ident is null) {
             error("関数%.*sの第%d引数は識別子ではありません", func_name.str.length, func_name.str.ptr, node.func_def_args.length + 1);
+            return null;
+        }
 
         node.func_def_args ~= Variable(arg_type, arg_ident);
     }
@@ -154,13 +162,52 @@ Node* func_def()
 }
 
 
-// stmt = expr ";"
-//      | "{" stmt* "}"
+Node* expr_stmt_or_def_var()
+{
+    // まず式文かどうか試す
+    ignore_error = true;
+    auto saved_tokenizer_state = save_tokenizer();
+    if(expr() !is null && consume_reserved(";")) {
+        // 式文
+        ignore_error = false;
+        restore_tokenizer(saved_tokenizer_state);
+
+        Node* node = new Node;
+        node.kind = NodeKind.EXPR_STMT;
+        node.lhs = expr();
+        expect(";");
+        return node;
+    }
+
+    ignore_error = false;
+    restore_tokenizer(saved_tokenizer_state);
+
+    // 変数定義
+    {
+        Node* node = new Node;
+        node.kind = NodeKind.LVAR_DEF;
+        node.def_var.type = type().type;
+        node.def_var.token = consume_ident();
+
+        if(consume_reserved("=")) {
+            node.lhs = expr();
+        }
+
+        expect(";");
+        return node;
+    }
+
+    return null;
+}
+
+
+// stmt = "{" stmt* "}"
 //      | "return" expr ";"
 //      | "break" ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
-//      | "for" "(" expr? ";" expr? ";" expr? ")" stmt
+//      | "for" "(" (expr_stmt_or_def_var | ";") expr? ";" expr? ")" stmt
 //      | "while" "(" expr ")" stmt
+//      | expr_stmt_of_def_var
 Node* stmt()
 {
     if(consume_reserved("{")) {
@@ -197,10 +244,8 @@ Node* stmt()
         expect("(");
         Node* node = new Node;
         node.kind = NodeKind.FOR;
-        if(!consume_reserved(";")) {
-            node.init_expr = expr();
-            expect(";");
-        }
+        if(!consume_reserved(";"))
+            node.init_stmt = expr_stmt_or_def_var();
 
         if(!consume_reserved(";")) {
             node.cond = expr();
@@ -237,19 +282,15 @@ Node* stmt()
         return node;
     }
 
-    Node* node;
     if(consume(TokenKind.RETURN)) {
-        node = new Node;
+        Node* node = new Node;
         node.kind = NodeKind.RETURN;
         node.lhs = expr();
-    } else {
-        node = new Node;
-        node.kind = NodeKind.EXPR_STMT;
-        node.lhs = expr();
+        expect(";");
+        return node;
     }
 
-    expect(";");
-    return node;
+    return expr_stmt_or_def_var();
 }
 
 
