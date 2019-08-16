@@ -162,6 +162,9 @@ Node* func_def()
 }
 
 
+// expr_stmt_or_def_var
+//      = expr ";"
+//      | type ident ("=" expr)? ";"
 Node* expr_stmt_or_def_var()
 {
     // まず式文かどうか試す
