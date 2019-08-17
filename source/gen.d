@@ -8,10 +8,40 @@ import core.stdc.stdio;
 import core.stdc.stdlib;
 
 
+struct RegType
+{
+    string str;
+}
+
+
+RegType make_llvm_ir_reg_type(Type* type)
+{
+    RegType ret;
+
+    if(type.kind == TypeKind.POINTER) {
+        ret.str = make_llvm_ir_reg_type(type.nested).str ~ "*";
+    } else {
+        if(type.str == "int")
+            ret.str = "i32";
+        else
+            error("'%.*s': 不明な型です", type.str.length, type.str.ptr);
+    }
+
+    return ret;
+}
+
+
 struct Reg
 {
     int id;
     char[] str;
+    RegType type;
+}
+
+
+bool is_pointer(Reg reg)
+{
+    return reg.type.str[$-1] == '*';
 }
 
 
@@ -20,6 +50,7 @@ Reg make_reg_id(int id)
     Reg reg;
     reg.id = id;
     reg.str = null;
+    reg.type.str = "i32";
     return reg;
 }
 
@@ -29,19 +60,24 @@ Reg make_reg_str(char[] str)
     Reg reg;
     reg.id = -1;
     reg.str = str;
+    reg.type.str = "i32*";
     return reg;
 }
 
 
 void gen_llvm_ir_def_func(FILE* fp, Node* node)
 {
-    fprintf(fp, "define ");
-    gen_llvm_ir_type(fp, node.ret_type);
-    fprintf(fp, " @%.*s(", node.token.str.length, node.token.str.ptr);
+    {
+        RegType ret_type = make_llvm_ir_reg_type(node.ret_type);
+        fprintf(fp, "define %.*s @%.*s(",
+            ret_type.str.length, ret_type.str.ptr,
+            node.token.str.length, node.token.str.ptr
+        );
+    }
 
     foreach(i, e; node.func_def_args) {
-        // fprintf(fp, "i32");
-        gen_llvm_ir_type(fp, e.type);
+        RegType arg_type = make_llvm_ir_reg_type(e.type);
+        fprintf(fp, "%.*s", arg_type.str.length, arg_type.str.ptr);
         if(i != node.func_def_args.length - 1)
             fprintf(fp, ", ");
     }
@@ -328,37 +364,31 @@ Reg gen_llvm_ir_expr_lval(FILE* fp, Node* node, int* val_cnt)
 }
 
 
-void gen_llvm_ir_type(FILE* fp, Type* type)
+Reg gen_llvm_ir_alloca(FILE* fp, Variable v)
 {
-    if(type.kind == TypeKind.POINTER) {
-        gen_llvm_ir_type(fp, type.nested);
-        fprintf(fp, "*");
-        return;
-    } else {
-        if(type.str == "int") {
-            fprintf(fp, "i32");
-            return;
-        } else
-            error("'%.*s': 不明な型です", type.str.length, type.str.ptr);
-    }
-}
+    Reg reg;
+    reg.str = v.token.str;
+    reg.type = make_llvm_ir_reg_type(v.type);
 
+    fprintf(fp, "  %%%.*s = alloca %.*s\n",
+        reg.str.length, reg.str.ptr,
+        reg.type.str.length, reg.type.str.ptr,
+        );
 
-void gen_llvm_ir_alloca(FILE* fp, Variable v)
-{
-    fprintf(fp, "  %%%.*s = alloca ", v.token.str.length, v.token.str.ptr);
-    gen_llvm_ir_type(fp, v.type);
-    fprintf(fp, "\n");
+    reg.type.str = reg.type.str ~ "*";
+    return reg;
 }
 
 
 void gen_llvm_ir_store(FILE* fp, Variable v, int reg_id)
 {
-    fprintf(fp, "  store ");
-    gen_llvm_ir_type(fp, v.type);
-    fprintf(fp, " %%%d, ", reg_id);
-    gen_llvm_ir_type(fp, v.type);
-    fprintf(fp, "* %%%.*s\n", v.token.str.length, v.token.str.ptr);
+    RegType ty = make_llvm_ir_reg_type(v.type);
+    fprintf(fp, "  store %.*s %%%d, %.*s* %%%.*s\n",
+        ty.str.length, ty.str.ptr,
+        reg_id,
+        ty.str.length, ty.str.ptr,
+        v.token.str.length, v.token.str.ptr
+    );
 }
 
 
