@@ -199,6 +199,15 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             node.type = def.ret_type;
             return;
         
+        case NodeKind.DOT:
+            if(node.token.str == "sizeof") {
+                semantic_analysis_node(node.lhs, env, func, program);
+                node.type = make_int_type();
+                node.val = sizeof_type(node.lhs.type);
+                return;
+            }
+            assert(0);
+            break;
         case NodeKind.EXPR_STMT:
             semantic_analysis_node(node.lhs, env, func, program);
             return;

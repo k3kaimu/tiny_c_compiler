@@ -325,7 +325,6 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
 {
     switch(node.kind) {
         case NodeKind.NUM:
-        case NodeKind.SIZEOF:
             RegType ty = make_llvm_ir_reg_type(node.type);
             fprintf(fp, "  %%%d = add %.*s 0, %d\n",
                 ++*val_cnt,
@@ -427,6 +426,18 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             }
             return make_reg_id(ty, *val_cnt);
 
+        case NodeKind.DOT:
+            assert(node.token.str == "sizeof");
+            if(node.token.str == "sizeof") {
+                RegType ty = make_llvm_ir_reg_type(node.type);
+                fprintf(fp, "  %%%d = add %.*s 0, %d\n",
+                    ++*val_cnt,
+                    ty.str.length, ty.str.ptr,
+                    node.val);
+
+                return make_reg_id(ty, *val_cnt);
+            }
+            break;
         default:
             error("サポートしていないノードの種類です");
             break;

@@ -18,6 +18,7 @@ enum NodeKind
     GT,         // >
     GE,         // >=
     ASSIGN,     // =
+    DOT,        // .
     CAST,       // キャスト
     LVAR,       // ローカル変数
     NUM,        // 整数
@@ -30,7 +31,6 @@ enum NodeKind
     FOR,        // for, while
     FOREACH,    // foreach
     BREAK,      // break
-    SIZEOF,     // sizeof
     FUNC_DEF,   // 関数定義
     TYPE,       // 型
     LVAR_DEF,   // ローカル変数定義
@@ -94,12 +94,13 @@ Node* new_node(NodeKind kind, Node* lhs, Node* rhs)
 }
 
 
-Node* new_node_num(int val)
+Node* new_node_num(Token* tk, int val)
 {
     Node* node = new Node;
 
     node.kind = NodeKind.NUM;
     node.val = val;
+    node.token = tk;
 
     return node;
 }
@@ -302,7 +303,7 @@ Node* stmt()
         node.thenblock = stmt();
 
         if(node.cond is null)
-            node.cond = new_node_num(1);
+            node.cond = new_node_num(null, 1);
 
         return node;
     }
@@ -443,15 +444,14 @@ Node* mul()
 }
 
 
-// unary = ("+" | "-")? term
+// unary = ("+" | "-")? postfix
 //       | "cast" "(" type ")" unary
-//       | "sizeof" unary
 Node* unary()
 {
     if(consume_reserved("+"))
-        return term;
+        return postfix();
     else if(consume_reserved("-"))
-        return new_node(NodeKind.SUB, new_node_num(0), term());
+        return new_node(NodeKind.SUB, new_node_num(null, 0), postfix());
     else if(consume(TokenKind.CAST)) {
         expect("(");
         Type* ty = type().type;
@@ -459,13 +459,38 @@ Node* unary()
         Node* node = unary();
 
         return new_node_cast(ty, node);
-    } else if(consume(TokenKind.SIZEOF)) {
-        Node* node = new Node;
-        node.kind = NodeKind.SIZEOF;
-        node.lhs = unary();
-        return node;
     } else
-        return term();
+        return postfix();
+}
+
+
+// postfix = term
+//         | postfix "." ident
+Node* postfix()
+{
+    Node* lhs = term();
+
+    while(1) {
+        Token* tk = token;
+
+        if(consume_reserved(".")) {
+            Node* new_node = new Node;
+            new_node.token = tk;
+            new_node.kind = NodeKind.DOT;
+            new_node.token = consume_ident();
+            new_node.lhs = lhs;
+            lhs = new_node;
+
+            if(new_node.token is null) {
+                error_at(tk.str.ptr, "メンバアクセス演算子 '.' の後続に識別子がありません");
+                return null;
+            }
+            continue;
+        }
+        return lhs;
+    }
+
+    return lhs;
 }
 
 
@@ -508,7 +533,7 @@ Node* term()
         }
     }
 
-    return new_node_num(expect_number());
+    return new_node_num(token, expect_number());
 }
 
 

@@ -146,12 +146,12 @@ unittest
     assert(test("int a = 11; int b = 0; foreach(int i; 0 .. a) { a = i; b = b + i; } return b;", 55));
     assert(test("short a = cast(short)12; return a;", 12));
     assert(test("auto a = 12; auto b = a; return a + b;", 24));
-    assert(test("auto a = 12; return sizeof a;", 4));
-    assert(test("long a = 12; return sizeof a;", 8));
-    assert(test("char a; return sizeof a;", 1));
-    assert(test("short a; return sizeof a;", 2));
-    assert(test("int a; return sizeof a;", 4));
-    assert(test("char a; auto b = a; return sizeof b;", 1));
+    assert(test("auto a = 12; return a.sizeof;", 4));
+    assert(test("long a = 12; return a.sizeof;", 8));
+    assert(test("char a; return a.sizeof;", 1));
+    assert(test("short a; return a.sizeof;", 2));
+    assert(test("int a; return a.sizeof;", 4));
+    assert(test("char a; auto b = a; return b.sizeof;", 1));
     assert(test("char a = cast(char)255; a = a + cast(char)1; a = a + cast(char)10; return a;", 10));
     assert(test("long a = 1; foreach(int i; 0 .. 100) if(i % 2 != 0) a = a * i; return cast(int)(a % 64);", 35));
 }
