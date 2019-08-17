@@ -34,7 +34,7 @@ RegType make_llvm_ir_reg_type(Type* type)
 struct Reg
 {
     int id;
-    char[] str;
+    const(char)[] str;
     RegType type;
 }
 
@@ -84,16 +84,18 @@ void gen_llvm_ir_def_func(FILE* fp, Node* node)
     fprintf(fp, ") {\n");
     fprintf(fp, "entry:\n");
 
-    char[][] lvar_defined;
+    const(char[])[] lvar_defined;
 
     foreach(i, e; node.func_def_args) {
-        gen_llvm_ir_alloca(fp, e);
+        gen_llvm_ir_alloca(fp, e.type, e.token.str);
         gen_llvm_ir_store(fp, e, cast(int)i);
         lvar_defined ~= e.token.str;
     }
 
     foreach(e; node.func_def_body)
         gen_llvm_ir_def_lvars(fp, e, lvar_defined);
+
+    gen_llvm_ir_def_lvar(fp, node.ret_type, "__ret_var", lvar_defined);
 
     int block_cnt = 0;
     int loop_cnt = 0;
@@ -103,24 +105,35 @@ void gen_llvm_ir_def_func(FILE* fp, Node* node)
     foreach(e; node.func_def_body)
         gen_llvm_ir_stmt(fp, e, &var_cnt, &loop_cnt, &block_cnt);
 
-    fprintf(fp, "  ret i32 -1\n");
+    fprintf(fp, "  br label %%LRET\n\n");
+    fprintf(fp, "LRET:\n");
+    fprintf(fp, "  %%__ret_val = load i32, i32* %%__ret_var\n");
+    fprintf(fp, "  ret i32 %%__ret_val\n", var_cnt);
 
     fprintf(fp, "}\n");
 }
 
-void gen_llvm_ir_def_lvars(FILE* fp, Node* node, ref char[][] lvar_defined)
+
+void gen_llvm_ir_def_lvar(FILE* fp, Type* ty, const(char)[] lvarname, ref const(char[])[] lvar_defined)
+{
+    // すでに定義されていないか探す
+    foreach(const(char)[] name; lvar_defined)
+        if(name == lvarname)
+            return;
+
+    gen_llvm_ir_alloca(fp, ty, lvarname);
+    lvar_defined ~= lvarname;
+    return;
+}
+
+
+void gen_llvm_ir_def_lvars(FILE* fp, Node* node, ref const(char[])[] lvar_defined)
 {
     if(node is null)
         return;
 
     if(node.kind == NodeKind.LVAR_DEF) {
-        // すでに定義されていないか探す
-        foreach(char[] name; lvar_defined)
-            if(name == node.def_var.token.str)
-                return;
-
-        gen_llvm_ir_alloca(fp, node.def_var);
-        lvar_defined ~= node.def_var.token.str;
+        gen_llvm_ir_def_lvar(fp, node.def_var.type, node.def_var.token.str, lvar_defined);
         return;
     }
 
@@ -175,12 +188,15 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
         }
 
         fprintf(fp, "BIF%d.next:\n", this_block_id);
+        gen_llvm_ir_dummy_op(fp, val_cnt);
 
         return;
     } else if (node.kind == NodeKind.RETURN) {
         Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-        fprintf(fp, "  ret i32 %%%d\n\n", lhs_reg.id);
+        fprintf(fp, "  store i32 %%%d, i32* %%__ret_var\n", lhs_reg.id);
+        fprintf(fp, "  br label %%LRET\n\n");
         ++*val_cnt;     // ret命令はBasic Blockを作るので，そのラベルを回避する
+        fprintf(fp, "; <label>:%%%d:\n", *val_cnt);
         return;
     } else if(node.kind == NodeKind.EXPR_STMT) {
         gen_llvm_ir_expr(fp, node.lhs, val_cnt);
@@ -239,6 +255,7 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
 
         fprintf(fp, "  br label %%LFOR%d.cond\n\n", this_loop_id);
         fprintf(fp, "LFOR%d.end:\n", this_loop_id);
+        gen_llvm_ir_dummy_op(fp, val_cnt);
         return;
     } else if(node.kind == NodeKind.BREAK) {
         fprintf(fp, "  br label %%LFOR%d.end\n\n", *loop_cnt);
@@ -260,13 +277,12 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
 
 Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
 {
-    if(node.kind == NodeKind.NUM) {
-        ++*val_cnt;
-        fprintf(fp, "  %%%d = add i32 0, %d\n", *val_cnt, node.val);
-        return make_reg_id(*val_cnt);
-    }
-
     switch(node.kind) {
+        case NodeKind.NUM:
+            ++*val_cnt;
+            fprintf(fp, "  %%%d = add i32 0, %d\n", *val_cnt, node.val);
+            break;
+
         case NodeKind.ADD:
             Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
             Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
@@ -364,11 +380,11 @@ Reg gen_llvm_ir_expr_lval(FILE* fp, Node* node, int* val_cnt)
 }
 
 
-Reg gen_llvm_ir_alloca(FILE* fp, Variable v)
+Reg gen_llvm_ir_alloca(FILE* fp, Type* ty, const(char)[] lvarname)
 {
     Reg reg;
-    reg.str = v.token.str;
-    reg.type = make_llvm_ir_reg_type(v.type);
+    reg.str = lvarname;
+    reg.type = make_llvm_ir_reg_type(ty);
 
     fprintf(fp, "  %%%.*s = alloca %.*s\n",
         reg.str.length, reg.str.ptr,
@@ -436,4 +452,10 @@ Reg gen_llvm_ir_icmp_ne_0(FILE* fp, int lhs_id, int* val_cnt)
     ++*val_cnt;
     fprintf(fp, "  %%%d = icmp ne i32 %%%d, 0\n", *val_cnt, lhs_id);
     return make_reg_id(*val_cnt);
+}
+
+
+void gen_llvm_ir_dummy_op(FILE* fp, int* val_cnt)
+{
+    fprintf(fp, "  %%%d = add i32 0, 0\n", ++*val_cnt);
 }
