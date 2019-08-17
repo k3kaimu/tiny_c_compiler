@@ -36,12 +36,25 @@ auto get_ir(string code)
 }
 
 
+bool test_with_report(string ir, int expected)
+{
+    auto lli = execute_lli(ir);
+    if(lli.status == expected)
+        return true;
+
+    writeln("Unittest is failed.");
+    writefln("lli status: %s", lli.status);
+    writefln("lli output:\n%s", lli.output);
+    writefln("generated LLVM-IR:\n%s", ir);
+    return false;
+}
+
+
 unittest
 {
     bool test(string input, int expected) {
         auto ir = get_ir("int main(){" ~ input ~ "}" );
-        auto status = execute_lli(ir).status;
-        return status == expected;
+        return test_with_report(ir, expected);
     }
 
     assert(test("return 0;", 0));
@@ -141,7 +154,7 @@ unittest
         ir ~= "  ret i32 12\n";
         ir ~= "}\n";
 
-        return execute_lli(ir).status == expected;
+        return test_with_report(ir, expected);
     }
 
     assert(test_arg0("return foo();", 12));
@@ -157,7 +170,7 @@ unittest
         ir ~= "  ret i32 %3\n";
         ir ~= "}\n";
 
-        return execute_lli(ir).status == expected;
+        return test_with_report(ir, expected);
     }
 
     assert(test_arg2("return foo(1, 2);", 3));
@@ -183,5 +196,5 @@ unittest
         }
     };
 
-    assert(execute_lli(get_ir(code)).status == 144);
+    assert(test_with_report(get_ir(code), 144));
 }
