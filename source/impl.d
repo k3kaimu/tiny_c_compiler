@@ -4,6 +4,7 @@ import tokenizer;
 import utils;
 import ast;
 import gen;
+import sema;
 
 import core.stdc.stdio;
 import core.stdc.string;
@@ -20,6 +21,8 @@ int Main(FILE* fp, int argc, char** argv)
     size_t input_len = strlen(argv[1]);
     token = tokenize(argv[1][0 .. input_len]);
     Node*[] func_defs = program();
+
+    semantic_analysis(func_defs);
 
     foreach(e; func_defs) {
         gen_llvm_ir_def_func(fp, e);

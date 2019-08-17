@@ -366,9 +366,23 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             gen_llvm_ir_store(fp, rhs_reg, lhs_reg);
             gen_llvm_ir_load(fp, lhs_reg, val_cnt);
             break;
+        case NodeKind.CAST:
+            assert(is_integer_type(node.type) || is_pointer_type(node.type));
+
+            Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+
+            if(is_integer_type(node.type)) {
+                assert(is_integer_type(node.lhs.type));
+                gen_llvm_ir_integer_cast(fp, make_llvm_ir_reg_type(node.type), lhs_reg, val_cnt);
+            } else if(is_pointer_type(node.type)) {
+                assert(is_pointer_type(node.lhs.type));
+                gen_llvm_ir_pointer_cast(fp,  make_llvm_ir_reg_type(node.type), lhs_reg, val_cnt);
+            }
+
+            break;
+
         default:
-            fprintf(stderr, "サポートしていないノードの種類です\n");
-            exit(1);
+            error("サポートしていないノードの種類です");
             break;
     }
 
@@ -392,8 +406,7 @@ Reg gen_llvm_ir_expr_lval(FILE* fp, Node* node, int* val_cnt)
             return lhs_reg;
 
         default:
-            fprintf(stderr, "サポートしていないノードの種類です\n");
-            exit(1);
+            error("サポートしていないノードの種類です");
             break;
     }
 
@@ -509,4 +522,41 @@ Reg gen_llvm_ir_icmp_ne_0(FILE* fp, int lhs_id, int* val_cnt)
 void gen_llvm_ir_dummy_op(FILE* fp, int* val_cnt)
 {
     fprintf(fp, "  %%%d = add i32 0, 0\n", ++*val_cnt);
+}
+
+
+Reg gen_llvm_ir_integer_cast(FILE* fp, RegType ty, Reg val, int* val_cnt)
+{
+    assert(ty.str[0] == 'i');
+
+    if(ty.str == val.type.str)
+        return val;
+
+    if(ty.str < val.type.str) {
+        fprintf(fp, "  %%%d = trunc ", ++*val_cnt);
+        gen_llvm_ir_reg_with_type(fp, val);
+        fprintf(fp, " to %.*s\n",
+            ty.str.length, ty.str.ptr,
+        );
+    } else {
+        fprintf(fp, "  %%%d = sext ", ++*val_cnt);
+        gen_llvm_ir_reg_with_type(fp, val);
+        fprintf(fp, " to %.*s\n",
+            ty.str.length, ty.str.ptr,
+        );
+    }
+
+    return make_reg_id(ty, *val_cnt);
+}
+
+
+Reg gen_llvm_ir_pointer_cast(FILE* fp, RegType ty, Reg val, int* val_cnt)
+{
+    fprintf(fp, "  %%%d = bitcast ", ++*val_cnt);
+    gen_llvm_ir_reg_with_type(fp, val);
+    fprintf(fp, " to %.*s\n",
+        ty.str.length, ty.str.ptr,
+    );
+
+    return make_reg_id(ty, *val_cnt);
 }

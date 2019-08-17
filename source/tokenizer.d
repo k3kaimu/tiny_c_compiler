@@ -28,7 +28,7 @@ struct Token
     TokenKind kind; // トークンの型
     Token *next;    // 次の入力トークン
     int val;        // kindがTK_NUMの場合，その数値
-    char[] str;
+    const(char)[] str;
 }
 
 

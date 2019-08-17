@@ -88,8 +88,8 @@ unittest
     assert(test("return -1<0;", 1));
     assert(test("return 1<=0;", 0));
     assert(test("return 0<=0;", 1));
-    assert(test("return a=1;", 1));
-    assert(test("return b=1;", 1));
+    assert(test("int a; return a=1;", 1));
+    assert(test("int a; int b; return a=b=1;", 1));
     assert(test("int a=1; int b; return b=a*2;", 2));
     assert(test("int a=1; int b=a*2;return b=b*2;", 4));
     assert(test("int foo=1;int bar=foo*2;return bar=bar*2;", 4));
@@ -123,7 +123,7 @@ unittest
     }, 9));
     assert(test("int b=0; for(int a=1;a<10;a=a+1) { if(a > 5) b = b + a; } return b;", 30));
     assert(test("int a=0; for(;a<10;) { a = a + 1; } return a;", 10));
-    assert(test("int c=0; for(int a=0;a<3;a=a+1) { for(int b=0;b<3;b=b+1) c = c + 1; } for(int a=0;a<10;a=a+1) {} return a+c;", 19));
+    assert(test("int c=0; for(int a=0;a<3;a=a+1) { for(int b=0;b<3;b=b+1) c = c + 1; } int a; for(a=0;a<10;a=a+1) {} return a+c;", 19));
     assert(test("int c=0; for(int a=0;a<10;a=a+1) { c=c+1; if(a==3) break; } return c;", 4));
     assert(test(q{
         int c = 0;
@@ -150,12 +150,7 @@ unittest
 {
     bool test_arg0(string input, int expected)
     {
-        auto ir = get_ir("int main() { " ~ input ~ "}");
-        ir ~= "\n";
-        ir ~= "define i32 @foo() {\n";
-        ir ~= "  ret i32 12\n";
-        ir ~= "}\n";
-
+        auto ir = get_ir("int main() { " ~ input ~ "} int foo() { return 12; }");
         return test_with_report(ir, expected);
     }
 
@@ -165,13 +160,7 @@ unittest
 
     bool test_arg2(string input, int expected)
     {
-        auto ir = get_ir("int main() { " ~ input ~ "}");
-        ir ~= "\n";
-        ir ~= "define i32 @foo(i32, i32) {\n";
-        ir ~= "  %3 = add i32 %0, %1\n";
-        ir ~= "  ret i32 %3\n";
-        ir ~= "}\n";
-
+        auto ir = get_ir("int main() { " ~ input ~ "} int foo(int a, int b) { return a + b; }");
         return test_with_report(ir, expected);
     }
 

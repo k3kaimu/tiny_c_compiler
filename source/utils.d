@@ -8,7 +8,7 @@ char* user_input;   // 入力プログラム
 
 bool ignore_error = false;
 
-void error_at(char* loc, string fmt, ...)
+void error_at(const(char)* loc, string fmt, ...)
 {
     if(!ignore_error) {
         char* cfmt = toStringz(fmt);

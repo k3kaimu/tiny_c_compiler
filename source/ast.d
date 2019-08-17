@@ -17,6 +17,7 @@ enum NodeKind
     GT,         // >
     GE,         // >=
     ASSIGN,     // =
+    CAST,       // キャスト
     LVAR,       // ローカル変数
     NUM,        // 整数
     FUNC_CALL,  // 関数呼び出し
@@ -97,6 +98,18 @@ Node* new_node_num(int val)
 
     node.kind = NodeKind.NUM;
     node.val = val;
+
+    return node;
+}
+
+
+Node* new_node_cast(Type* toType, Node* from)
+{
+    Node* node = new Node;
+
+    node.kind = NodeKind.CAST;
+    node.lhs = from;
+    node.type = toType;
 
     return node;
 }
@@ -217,6 +230,8 @@ Node* def_var()
     node.def_var.type = type().type;
     node.def_var.token = consume_ident();
     expect(";");
+    assert(node.def_var.type !is null);
+    assert(node.def_var.token !is null);
     return node;
 }
 
