@@ -133,8 +133,13 @@ void gen_llvm_ir_def_func(FILE* fp, Node* node)
 
     fprintf(fp, "  br label %%LRET\n\n");
     fprintf(fp, "LRET:\n");
-    fprintf(fp, "  %%__ret_val = load i32, i32* %%__ret_var\n");
-    fprintf(fp, "  ret i32 %%__ret_val\n", var_cnt);
+    fprintf(fp, "  %%__ret_val = load %.*s, %.*s* %%__ret_var\n",
+        ret_type.str.length, ret_type.str.ptr,
+        ret_type.str.length, ret_type.str.ptr,
+    );
+    fprintf(fp, "  ret %.*s %%__ret_val\n",
+        ret_type.str.length, ret_type.str.ptr
+    );
 
     fprintf(fp, "}\n");
 }
@@ -253,12 +258,8 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
             Reg cond_val_reg = gen_llvm_ir_expr(fp, node.cond, val_cnt);
             cond_val_i1_reg = gen_llvm_ir_icmp_ne_0(fp, cond_val_reg.id, val_cnt);
         } else {                        // foreach
-            int value_of_loop_var_id = ++*val_cnt;
-            fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n",
-                value_of_loop_var_id,
-                node.def_loop_var.def_var.token.str.length, node.def_loop_var.def_var.token.str.ptr,
-            );
-            cond_val_i1_reg = gen_llvm_ir_icmp(fp, NodeKind.LT, value_of_loop_var_id, foreach_end_val_reg.id, val_cnt);
+            Reg value_of_loop_var_reg = gen_llvm_ir_load(fp, make_reg_from_Variable(node.def_loop_var.def_var), val_cnt);
+            cond_val_i1_reg = gen_llvm_ir_icmp(fp, NodeKind.LT, value_of_loop_var_reg.id, foreach_end_val_reg.id, val_cnt);
         }
 
         fprintf(fp, "  br i1 %%%d, label %%LFOR%d.then, label %%LFOR%d.end\n\n", cond_val_i1_reg.id, this_loop_id, this_loop_id);
@@ -269,13 +270,9 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
             if(node.update_expr !is null)
                 gen_llvm_ir_expr(fp, node.update_expr, val_cnt);
         } else {                        // foreach
-            int value_of_loop_var_id = ++*val_cnt;
-             fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n",
-                value_of_loop_var_id,
-                node.def_loop_var.def_var.token.str.length, node.def_loop_var.def_var.token.str.ptr,
-            );
+            Reg value_of_loop_var_reg = gen_llvm_ir_load(fp, make_reg_from_Variable(node.def_loop_var.def_var), val_cnt);
             int next_value_id = ++*val_cnt;
-            fprintf(fp, "  %%%d = add i32 %%%d, 1\n", next_value_id, value_of_loop_var_id);
+            fprintf(fp, "  %%%d = add i32 %%%d, 1\n", next_value_id, value_of_loop_var_reg.id);
             gen_llvm_ir_store(fp, make_reg_id(RegType("i32"), next_value_id), make_reg_from_Variable(node.def_loop_var.def_var));
         }
 
@@ -345,8 +342,7 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             fprintf(fp, "  %%%d = zext i1 %%%d to i32\n", ++*val_cnt, icmp_reg.id);
             break;
         case NodeKind.LVAR:
-            ++*val_cnt;
-            fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n", *val_cnt, node.token.str.length, node.token.str.ptr);
+            gen_llvm_ir_load(fp, make_reg_str(RegType("i32*"), node.token.str), val_cnt);
             break;
         case NodeKind.FUNC_CALL:
             int[] arg_ids;
@@ -368,8 +364,7 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             Reg lhs_reg = gen_llvm_ir_expr_lval(fp, node.lhs, val_cnt);
             Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
             gen_llvm_ir_store(fp, rhs_reg, lhs_reg);
-            ++*val_cnt;
-            fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n", *val_cnt, lhs_reg.str.length, lhs_reg.str.ptr);
+            gen_llvm_ir_load(fp, lhs_reg, val_cnt);
             break;
         default:
             fprintf(stderr, "サポートしていないノードの種類です\n");
@@ -452,7 +447,7 @@ Reg gen_llvm_ir_load(FILE* fp, Reg src, int* val_cnt)
     string deref_type = src.type.str[0 .. $-1];
     fprintf(fp, "  %%%d = load %.*s, ",
         *val_cnt,
-        deref_type.length, deref_type.length,
+        deref_type.length, deref_type.ptr,
     );
     gen_llvm_ir_reg_with_type(fp, src);
     fprintf(fp, "\n");
