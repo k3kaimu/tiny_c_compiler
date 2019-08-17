@@ -21,8 +21,8 @@ void error_at(char* loc, string fmt, ...)
         fprintf(stderr, "^ ");
         vfprintf(stderr, cfmt, ap);
         fprintf(stderr, "\n");
-        exit(1);
-        // throw new Exception("");
+        // exit(1);
+        throw new Exception("");
     }
 }
 
@@ -35,7 +35,8 @@ void error(string fmt, ...)
         va_start(ap, cfmt);
         vfprintf(stderr, cfmt, ap);
         fprintf(stderr, "\n");
-        exit(1);
+        // exit(1);
+        throw new Exception("");
     }
 }
 
