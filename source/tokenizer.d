@@ -16,7 +16,15 @@ enum TokenKind
     WHILE,          // while
     BREAK,          // break
     FOREACH,        // foreach
+    AUTO,           // auto
+    BOOL,           // bool
+    CHAR,           // char
+    BYTE,           // byte
+    SHORT,          // short
     INT,            // int
+    LONG,           // long
+    CAST,           // cast
+    SIZEOF,         // sizeof
     IDENT,          // 識別子
     NUM,            // 整数トークン
     EOF,            // 入力の終わりを表すトークン
@@ -178,8 +186,56 @@ Token* tokenize(char[] str)
             continue;
         }
 
+        if(size_t len = starts_with_reserved(str, "auto")) {
+            cur = new_token(TokenKind.AUTO, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "bool")) {
+            cur = new_token(TokenKind.BOOL, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "char")) {
+            cur = new_token(TokenKind.CHAR, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "byte")) {
+            cur = new_token(TokenKind.BYTE, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "short")) {
+            cur = new_token(TokenKind.SHORT, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
         if(size_t len = starts_with_reserved(str, "int")) {
             cur = new_token(TokenKind.INT, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "long")) {
+            cur = new_token(TokenKind.LONG, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "cast")) {
+            cur = new_token(TokenKind.CAST, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "sizeof")) {
+            cur = new_token(TokenKind.SIZEOF, cur, str[0 .. len]);
             str = str[len .. $];
             continue;
         }
@@ -206,7 +262,7 @@ Token* tokenize(char[] str)
             continue;
         }
 
-        if(str[0] == '+' || str[0] == '-' || str[0] == '*' || str[0] == '/' || str[0] == '(' || str[0] == ')' || str[0] == '>' || str[0] == '<') {
+        if(str[0] == '+' || str[0] == '-' || str[0] == '*' || str[0] == '/' || str[0] == '%' || str[0] == '(' || str[0] == ')' || str[0] == '>' || str[0] == '<') {
             cur = new_token(TokenKind.RESERVED, cur, str[0 .. 1]);
             str = str[1 .. $];
             continue;

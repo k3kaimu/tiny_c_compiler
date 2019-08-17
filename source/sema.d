@@ -94,14 +94,14 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
         case NodeKind.SUB:
         case NodeKind.MUL:
         case NodeKind.DIV:
+        case NodeKind.REM:
             semantic_analysis_node(node.lhs, env, func, program);
             semantic_analysis_node(node.rhs, env, func, program);
 
             Type* comty = common_type_of(node.lhs.type, node.rhs.type);
 
-            if(!is_same_type(node.lhs.type, comty)) {
+            if(!is_same_type(node.lhs.type, comty))
                 node.lhs = new_node_cast_with_check(comty, node.lhs);
-            }
 
             if(!is_same_type(node.rhs.type, comty))
                 node.rhs = new_node_cast_with_check(comty, node.rhs);
@@ -141,6 +141,9 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
                     node.rhs.type.str.length, node.rhs.type.str.ptr,
                 );
             }
+
+            if(!is_same_type(node.lhs.type, node.rhs.type))
+                node.rhs = new_node_cast_with_check(node.lhs.type, node.rhs);
 
             node.type = node.lhs.type;
             node.type.islval = true;
@@ -218,6 +221,10 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
                     val_type.str.length, val_type.str.ptr,
                 );
             }
+
+            if(!is_same_type(ret_type, val_type))
+                node.lhs = new_node_cast_with_check(ret_type, node.lhs);
+
             return;
 
         case NodeKind.IF:
@@ -290,6 +297,12 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             }
             return;
 
+        case NodeKind.SIZEOF:
+            semantic_analysis_node(node.lhs, env, func, program);
+            node.type = make_int_type();
+            node.val = sizeof_type(node.lhs.type);
+            return;
+
         case NodeKind.FUNC_DEF:
             error("関数定義の中に関数定義を含めることはできません");
             return;
@@ -310,6 +323,9 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
                         node.def_var.type.str.length, node.def_var.type.str.ptr,
                     );
                 }
+
+                if(!is_same_type(node.def_var.type, node.lhs.type))
+                    node.lhs = new_node_cast_with_check(node.def_var.type, node.lhs);
             }
 
             if(is_auto_type(node.def_var.type)) {

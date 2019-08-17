@@ -10,6 +10,7 @@ enum NodeKind
     SUB,        // -
     MUL,        // *
     DIV,        // /
+    REM,        // %
     EQ,         // ==
     NE,         // !=
     LT,         // <
@@ -29,6 +30,7 @@ enum NodeKind
     FOR,        // for, while
     FOREACH,    // foreach
     BREAK,      // break
+    SIZEOF,     // sizeof
     FUNC_DEF,   // 関数定義
     TYPE,       // 型
     LVAR_DEF,   // ローカル変数定義
@@ -210,6 +212,9 @@ Node* expr_stmt_or_def_var()
         node.kind = NodeKind.LVAR_DEF;
         node.def_var.type = type().type;
         node.def_var.token = consume_ident();
+        node.token = node.def_var.token;
+        assert(node.def_var.type !is null);
+        assert(node.def_var.token !is null);
 
         if(consume_reserved("=")) {
             node.lhs = expr();
@@ -229,6 +234,7 @@ Node* def_var()
     node.kind = NodeKind.LVAR_DEF;
     node.def_var.type = type().type;
     node.def_var.token = consume_ident();
+    node.token = node.def_var.token;
     expect(";");
     assert(node.def_var.type !is null);
     assert(node.def_var.token !is null);
@@ -419,7 +425,7 @@ Node* add()
 }
 
 
-// mul  = unary ("*" unary | "/" unary)*
+// mul  = unary ("*" unary | "/" unary | "%" unary)*
 Node* mul()
 {
     Node* node = unary();
@@ -429,6 +435,8 @@ Node* mul()
             node = new_node(NodeKind.MUL, node, unary());
         else if(consume_reserved("/"))
             node = new_node(NodeKind.DIV, node, unary());
+        else if(consume_reserved("%"))
+            node = new_node(NodeKind.REM, node, unary());
         else
             return node;
     }
@@ -436,13 +444,27 @@ Node* mul()
 
 
 // unary = ("+" | "-")? term
+//       | "cast" "(" type ")" unary
+//       | "sizeof" unary
 Node* unary()
 {
     if(consume_reserved("+"))
         return term;
     else if(consume_reserved("-"))
         return new_node(NodeKind.SUB, new_node_num(0), term());
-    else
+    else if(consume(TokenKind.CAST)) {
+        expect("(");
+        Type* ty = type().type;
+        expect(")");
+        Node* node = unary();
+
+        return new_node_cast(ty, node);
+    } else if(consume(TokenKind.SIZEOF)) {
+        Node* node = new Node;
+        node.kind = NodeKind.SIZEOF;
+        node.lhs = unary();
+        return node;
+    } else
         return term();
 }
 
@@ -500,10 +522,21 @@ Node* new_node_lvar(Token* ident)
 
 
 // type = basic_type "*"*
+//      | auto
 Node* type()
 {
     Node* node = new Node;
     node.kind = NodeKind.TYPE;
+
+    if(consume(TokenKind.AUTO)) {
+        Type* ty = new Type;
+        ty.kind = TypeKind.BASE;
+        ty.islval = false;
+        ty.str = "auto";
+        ty.nested = null;
+        node.type = ty;
+        return node;
+    }
 
     Type* ty = basic_type();
     while(consume_reserved("*")) {
@@ -519,14 +552,39 @@ Node* type()
 }
 
 
-// basic_type = int | ident
+// basic_type = char | byte | short | int | long | ident
 Type* basic_type()
 {
     Type* ty = new Type;
     ty.kind = TypeKind.BASE;
 
+    if(consume(TokenKind.BOOL)) {
+        ty.str = "bool";
+        return ty;
+    }
+
+    if(consume(TokenKind.CHAR)) {
+        ty.str = "char";
+        return ty;
+    }
+
+    if(consume(TokenKind.BYTE)) {
+        ty.str = "byte";
+        return ty;
+    }
+
+    if(consume(TokenKind.SHORT)) {
+        ty.str = "short";
+        return ty;
+    }
+
     if(consume(TokenKind.INT)) {
-        ty.str = cast(char[])"int";
+        ty.str = "int";
+        return ty;
+    }
+
+    if(consume(TokenKind.LONG)) {
+        ty.str = "long";
         return ty;
     }
 

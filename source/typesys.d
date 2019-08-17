@@ -15,6 +15,17 @@ struct Type
 }
 
 
+Type* make_basic_type(const(char)[] str)
+{
+    Type* ty = new Type;
+    ty.kind = TypeKind.BASE;
+    ty.islval = false;
+    ty.str = str;
+    ty.nested = null;
+    return ty;
+}
+
+
 Type* make_bool_type()
 {
     Type* ty = new Type;
@@ -83,7 +94,7 @@ bool is_pointer_type(Type* ty)
 bool is_integer_type(Type* ty)
 {
     return ty.kind == TypeKind.BASE
-        && (ty.str == "bool" || ty.str == "char" || ty.str == "short"
+        && (ty.str == "bool" || ty.str == "char" || ty.str == "byte" || ty.str == "short"
             || ty.str == "int" || ty.str == "long");
 }
 
@@ -95,7 +106,7 @@ int sizeof_type(Type* ty)
 
     if(ty.str == "bool")
         return 1;
-    else if(ty.str == "char")
+    else if(ty.str == "char" || ty.str == "byte")
         return 1;
     else if(ty.str == "short")
         return 2;
