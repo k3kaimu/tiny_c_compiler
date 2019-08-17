@@ -26,6 +26,7 @@ enum NodeKind
     IF,         // if
     IFELSE,     // if-else
     FOR,        // for, while
+    FOREACH,    // foreach
     BREAK,      // break
     FUNC_DEF,   // 関数定義
     TYPE,       // 型
@@ -56,6 +57,11 @@ struct Node
     // for(init_stmt; cond; update_expr) thenblock
     Node* init_stmt;
     Node* update_expr;
+
+    // foreach(def_loop_var; start .. end) thenblock
+    Node* def_loop_var;
+    Node* start_expr;
+    Node* end_expr;
 
     // block { stmt* }
     Node*[] stmts;
@@ -203,6 +209,17 @@ Node* expr_stmt_or_def_var()
     return null;
 }
 
+// def_var = type ident ";"
+Node* def_var()
+{
+    Node* node = new Node;
+    node.kind = NodeKind.LVAR_DEF;
+    node.def_var.type = type().type;
+    node.def_var.token = consume_ident();
+    expect(";");
+    return node;
+}
+
 
 // stmt = "{" stmt* "}"
 //      | "return" expr ";"
@@ -210,6 +227,7 @@ Node* expr_stmt_or_def_var()
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "for" "(" (expr_stmt_or_def_var | ";") expr? ";" expr? ")" stmt
 //      | "while" "(" expr ")" stmt
+//      | "foreach" "(" def_var ";" expr ".." expr ")" stmt
 //      | expr_stmt_of_def_var
 Node* stmt()
 {
@@ -275,6 +293,24 @@ Node* stmt()
         node.cond = expr();
         expect(")");
         node.thenblock = stmt();
+        return node;
+    }
+
+    if(consume(TokenKind.FOREACH)) {
+        expect("(");
+        Node* def = def_var();
+        Node* start_expr = expr();
+        expect("..");
+        Node* end_expr = expr();
+        expect(")");
+        Node* body_ = stmt();
+
+        Node* node = new Node;
+        node.kind = NodeKind.FOREACH;
+        node.def_loop_var = def;
+        node.start_expr = start_expr;
+        node.end_expr = end_expr;
+        node.thenblock = body_;
         return node;
     }
 
@@ -431,14 +467,20 @@ Node* term()
             return node;
         } else {
             // 変数
-            Node* node = new Node;
-            node.kind = NodeKind.LVAR;
-            node.token = tok;
-            return node;
+            return new_node_lvar(tok);
         }
     }
 
     return new_node_num(expect_number());
+}
+
+
+Node* new_node_lvar(Token* ident)
+{
+    Node* node = new Node;
+    node.kind = NodeKind.LVAR;
+    node.token = ident;
+    return node;
 }
 
 

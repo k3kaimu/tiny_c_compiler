@@ -130,18 +130,56 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
         foreach(stmt; node.stmts)
             gen_llvm_ir_stmt(fp, stmt, val_cnt, loop_cnt, block_cnt);
         return;
-    } else if(node.kind == NodeKind.FOR) {
+    } else if(node.kind == NodeKind.FOR || node.kind == NodeKind.FOREACH) {
         int this_loop_id = ++*loop_cnt;
-        if(node.init_stmt !is null) gen_llvm_ir_stmt(fp, node.init_stmt, val_cnt, loop_cnt, block_cnt);
+
+        int foreach_end_val_id = -1;    // foreachでend_expr()の評価結果のレジスタのid
+
+        if(node.kind == NodeKind.FOR) { // for
+            if(node.init_stmt !is null)
+                gen_llvm_ir_stmt(fp, node.init_stmt, val_cnt, loop_cnt, block_cnt);
+        } else {                        // foreach
+            int start_val_id = gen_llvm_ir_expr(fp, node.start_expr, val_cnt);
+            foreach_end_val_id = gen_llvm_ir_expr(fp, node.end_expr, val_cnt);
+            gen_llvm_ir_store(fp, node.def_loop_var.def_var, start_val_id);
+        }
 
         fprintf(fp, "  br label %%LFOR%d.cond\n\n", this_loop_id);
         fprintf(fp, "LFOR%d.cond:\n", this_loop_id);
-        int cond_val_id = gen_llvm_ir_expr(fp, node.cond, val_cnt);
-        fprintf(fp, "  %%%d = icmp ne i32 %%%d, 0\n", ++*val_cnt, cond_val_id);
-        fprintf(fp, "  br i1 %%%d, label %%LFOR%d.then, label %%LFOR%d.end\n\n", *val_cnt, this_loop_id, this_loop_id);
+
+        int cond_val_i1_id = -1;
+        if(node.kind == NodeKind.FOR) { // for
+            int cond_val_id = gen_llvm_ir_expr(fp, node.cond, val_cnt);
+            cond_val_i1_id = ++*val_cnt;
+            fprintf(fp, "  %%%d = icmp ne i32 %%%d, 0\n", cond_val_i1_id, cond_val_id);
+        } else {                        // foreach
+            int value_of_loop_var_id = ++*val_cnt;
+            cond_val_i1_id = ++*val_cnt;
+            fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n",
+                value_of_loop_var_id,
+                node.def_loop_var.def_var.token.str.length, node.def_loop_var.def_var.token.str.ptr,
+            );
+            fprintf(fp, "  %%%d = icmp slt i32 %%%d, %%%d\n", cond_val_i1_id, value_of_loop_var_id, foreach_end_val_id);
+        }
+
+        fprintf(fp, "  br i1 %%%d, label %%LFOR%d.then, label %%LFOR%d.end\n\n", cond_val_i1_id, this_loop_id, this_loop_id);
         fprintf(fp, "LFOR%d.then:\n", this_loop_id);
         gen_llvm_ir_stmt(fp, node.thenblock, val_cnt, loop_cnt, block_cnt);
-        if(node.update_expr !is null) gen_llvm_ir_expr(fp, node.update_expr, val_cnt);
+
+        if(node.kind == NodeKind.FOR) { // for
+            if(node.update_expr !is null)
+                gen_llvm_ir_expr(fp, node.update_expr, val_cnt);
+        } else {                        // foreach
+            int value_of_loop_var_id = ++*val_cnt;
+             fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n",
+                value_of_loop_var_id,
+                node.def_loop_var.def_var.token.str.length, node.def_loop_var.def_var.token.str.ptr,
+            );
+            int next_value_id = ++*val_cnt;
+            fprintf(fp, "  %%%d = add i32 %%%d, 1\n", next_value_id, value_of_loop_var_id);
+            gen_llvm_ir_store(fp, node.def_loop_var.def_var, next_value_id);
+        }
+
         fprintf(fp, "  br label %%LFOR%d.cond\n\n", this_loop_id);
         fprintf(fp, "LFOR%d.end:\n", this_loop_id);
         return;

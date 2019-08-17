@@ -15,6 +15,7 @@ enum TokenKind
     FOR,            // for
     WHILE,          // while
     BREAK,          // break
+    FOREACH,        // foreach
     INT,            // int
     IDENT,          // 識別子
     NUM,            // 整数トークン
@@ -171,6 +172,12 @@ Token* tokenize(char[] str)
             continue;
         }
 
+        if(size_t len = starts_with_reserved(str, "foreach")) {
+            cur = new_token(TokenKind.FOREACH, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
         if(size_t len = starts_with_reserved(str, "int")) {
             cur = new_token(TokenKind.INT, cur, str[0 .. len]);
             str = str[len .. $];
@@ -178,7 +185,7 @@ Token* tokenize(char[] str)
         }
 
         if(str.length >= 2) {
-            if(str[0 .. 2] == "==" || str[0 .. 2] == "!=" || str[0 .. 2] == "<=" || str[0 .. 2] == ">=") {
+            if(str[0 .. 2] == "==" || str[0 .. 2] == "!=" || str[0 .. 2] == "<=" || str[0 .. 2] == ">=" || str[0 .. 2] == "..") {
                 cur = new_token(TokenKind.RESERVED, cur, str[0 .. 2]);
                 str = str[2 .. $];
                 continue;

@@ -140,6 +140,8 @@ unittest
     assert(test("int a=0; while(a<10) { a = a+1; } return a;", 10));
     assert(test("int a=0; while(1) { a = a+1; if(a >= 10) break; } return a;", 10));
     assert(test("int a; a = 10; return a;", 10));
+    assert(test("int b = 0; foreach(int a; 0 .. 11) { b = b + a; } return b;", 55));
+    assert(test("int a = 11; int b = 0; foreach(int i; 0 .. a) { a = i; b = b + i; } return b;", 55));
 }
 
 
