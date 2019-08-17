@@ -8,6 +8,31 @@ import core.stdc.stdio;
 import core.stdc.stdlib;
 
 
+struct Reg
+{
+    int id;
+    char[] str;
+}
+
+
+Reg make_reg_id(int id)
+{
+    Reg reg;
+    reg.id = id;
+    reg.str = null;
+    return reg;
+}
+
+
+Reg make_reg_str(char[] str)
+{
+    Reg reg;
+    reg.id = -1;
+    reg.str = str;
+    return reg;
+}
+
+
 void gen_llvm_ir_def_func(FILE* fp, Node* node)
 {
     fprintf(fp, "define ");
@@ -94,15 +119,13 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
     if(node.kind == NodeKind.IF || node.kind == NodeKind.IFELSE) {
         int this_block_id = ++*block_cnt;
 
-        int cond_id = gen_llvm_ir_expr(fp, node.cond, val_cnt);
-        ++*val_cnt;
-        fprintf(fp, "  %%%d = icmp ne i32 %%%d, 0\n", *val_cnt, cond_id);
-        cond_id = *val_cnt;
+        Reg cond_reg = gen_llvm_ir_expr(fp, node.cond, val_cnt);
+        Reg cond_i8_reg = gen_llvm_ir_icmp_ne_0(fp, cond_reg.id, val_cnt);
 
         if(node.kind == NodeKind.IF) {  // if
-            fprintf(fp, "  br i1 %%%d, label %%BIF%d.then, label %%BIF%d.next\n\n", cond_id, this_block_id, this_block_id);
+            fprintf(fp, "  br i1 %%%d, label %%BIF%d.then, label %%BIF%d.next\n\n", cond_i8_reg.id, this_block_id, this_block_id);
         } else {                        // if-else
-            fprintf(fp, "  br i1 %%%d, label %%BIF%d.then, label %%BIF%d.else\n\n", cond_id, this_block_id, this_block_id);
+            fprintf(fp, "  br i1 %%%d, label %%BIF%d.then, label %%BIF%d.else\n\n", cond_i8_reg.id, this_block_id, this_block_id);
         }
 
         fprintf(fp, "BIF%d.then:\n", this_block_id);
@@ -119,8 +142,8 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
 
         return;
     } else if (node.kind == NodeKind.RETURN) {
-        int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-        fprintf(fp, "  ret i32 %%%d\n\n", *val_cnt);
+        Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+        fprintf(fp, "  ret i32 %%%d\n\n", lhs_reg.id);
         ++*val_cnt;     // ret命令はBasic Blockを作るので，そのラベルを回避する
         return;
     } else if(node.kind == NodeKind.EXPR_STMT) {
@@ -133,36 +156,34 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
     } else if(node.kind == NodeKind.FOR || node.kind == NodeKind.FOREACH) {
         int this_loop_id = ++*loop_cnt;
 
-        int foreach_end_val_id = -1;    // foreachでend_expr()の評価結果のレジスタのid
+        Reg foreach_end_val_reg;        // foreachでend_expr()の評価結果のレジスタのid
 
         if(node.kind == NodeKind.FOR) { // for
             if(node.init_stmt !is null)
                 gen_llvm_ir_stmt(fp, node.init_stmt, val_cnt, loop_cnt, block_cnt);
         } else {                        // foreach
-            int start_val_id = gen_llvm_ir_expr(fp, node.start_expr, val_cnt);
-            foreach_end_val_id = gen_llvm_ir_expr(fp, node.end_expr, val_cnt);
-            gen_llvm_ir_store(fp, node.def_loop_var.def_var, start_val_id);
+            Reg start_val_reg = gen_llvm_ir_expr(fp, node.start_expr, val_cnt);
+            foreach_end_val_reg = gen_llvm_ir_expr(fp, node.end_expr, val_cnt);
+            gen_llvm_ir_store(fp, node.def_loop_var.def_var, start_val_reg.id);
         }
 
         fprintf(fp, "  br label %%LFOR%d.cond\n\n", this_loop_id);
         fprintf(fp, "LFOR%d.cond:\n", this_loop_id);
 
-        int cond_val_i1_id = -1;
+        Reg cond_val_i1_reg;
         if(node.kind == NodeKind.FOR) { // for
-            int cond_val_id = gen_llvm_ir_expr(fp, node.cond, val_cnt);
-            cond_val_i1_id = ++*val_cnt;
-            fprintf(fp, "  %%%d = icmp ne i32 %%%d, 0\n", cond_val_i1_id, cond_val_id);
+            Reg cond_val_reg = gen_llvm_ir_expr(fp, node.cond, val_cnt);
+            cond_val_i1_reg = gen_llvm_ir_icmp_ne_0(fp, cond_val_reg.id, val_cnt);
         } else {                        // foreach
             int value_of_loop_var_id = ++*val_cnt;
-            cond_val_i1_id = ++*val_cnt;
             fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n",
                 value_of_loop_var_id,
                 node.def_loop_var.def_var.token.str.length, node.def_loop_var.def_var.token.str.ptr,
             );
-            fprintf(fp, "  %%%d = icmp slt i32 %%%d, %%%d\n", cond_val_i1_id, value_of_loop_var_id, foreach_end_val_id);
+            cond_val_i1_reg = gen_llvm_ir_icmp(fp, NodeKind.LT, value_of_loop_var_id, foreach_end_val_reg.id, val_cnt);
         }
 
-        fprintf(fp, "  br i1 %%%d, label %%LFOR%d.then, label %%LFOR%d.end\n\n", cond_val_i1_id, this_loop_id, this_loop_id);
+        fprintf(fp, "  br i1 %%%d, label %%LFOR%d.then, label %%LFOR%d.end\n\n", cond_val_i1_reg.id, this_loop_id, this_loop_id);
         fprintf(fp, "LFOR%d.then:\n", this_loop_id);
         gen_llvm_ir_stmt(fp, node.thenblock, val_cnt, loop_cnt, block_cnt);
 
@@ -190,8 +211,8 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
         return;
     } else if(node.kind == NodeKind.LVAR_DEF) {
         if(node.lhs !is null) {
-            int init_val_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-            gen_llvm_ir_store(fp, node.def_var, init_val_id);
+            Reg init_val_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            gen_llvm_ir_store(fp, node.def_var, init_val_reg.id);
         }
         return;
     } else {
@@ -201,75 +222,50 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
 }
 
 
-int gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
+Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
 {
     if(node.kind == NodeKind.NUM) {
         ++*val_cnt;
         fprintf(fp, "  %%%d = add i32 0, %d\n", *val_cnt, node.val);
-        return *val_cnt;
+        return make_reg_id(*val_cnt);
     }
 
     switch(node.kind) {
         case NodeKind.ADD:
-            int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
+            Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
             ++*val_cnt;
-            fprintf(fp, "  %%%d = add i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
+            fprintf(fp, "  %%%d = add i32 %%%d, %%%d\n", *val_cnt, lhs_reg.id, rhs_reg.id);
             break;
         case NodeKind.SUB:
-            int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
+            Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
             ++*val_cnt;
-            fprintf(fp, "  %%%d = sub i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
+            fprintf(fp, "  %%%d = sub i32 %%%d, %%%d\n", *val_cnt, lhs_reg.id, rhs_reg.id);
             break;
         case NodeKind.MUL:
-            int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
+            Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
             ++*val_cnt;
-            fprintf(fp, "  %%%d = mul i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
+            fprintf(fp, "  %%%d = mul i32 %%%d, %%%d\n", *val_cnt, lhs_reg.id, rhs_reg.id);
             break;
         case NodeKind.DIV:
-            int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
+            Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
             ++*val_cnt;
-            fprintf(fp, "  %%%d = sdiv i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
+            fprintf(fp, "  %%%d = sdiv i32 %%%d, %%%d\n", *val_cnt, lhs_reg.id, rhs_reg.id);
             break;
         case NodeKind.EQ:
-            int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
-            ++*val_cnt;
-            fprintf(fp, "  %%%d = icmp eq i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
-            goto Lzext;
         case NodeKind.NE:
-            int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
-            ++*val_cnt;
-            fprintf(fp, "  %%%d = icmp ne i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
-            goto Lzext;
         case NodeKind.LT:
-            int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
-            ++*val_cnt;
-            fprintf(fp, "  %%%d = icmp slt i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
-            goto Lzext;
         case NodeKind.LE:
-            int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
-            ++*val_cnt;
-            fprintf(fp, "  %%%d = icmp sle i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
-            goto Lzext;
         case NodeKind.GT:
-            int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
-            ++*val_cnt;
-            fprintf(fp, "  %%%d = icmp sgt i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
-            goto Lzext;
         case NodeKind.GE:
-            int lhs_id = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
-            ++*val_cnt;
-            fprintf(fp, "  %%%d = icmp sge i32 %%%d, %%%d\n", *val_cnt, lhs_id, rhs_id);
-            goto Lzext;
+            Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
+            Reg icmp_reg = gen_llvm_ir_icmp(fp, node.kind, lhs_reg.id, rhs_reg.id, val_cnt);
+            fprintf(fp, "  %%%d = zext i1 %%%d to i32\n", ++*val_cnt, icmp_reg.id);
+            break;
         case NodeKind.LVAR:
             ++*val_cnt;
             fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n", *val_cnt, node.token.str.length, node.token.str.ptr);
@@ -277,7 +273,7 @@ int gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
         case NodeKind.FUNC_CALL:
             int[] arg_ids;
             foreach(arg; node.func_call_args) {
-                arg_ids ~= gen_llvm_ir_expr(fp, arg, val_cnt);
+                arg_ids ~= gen_llvm_ir_expr(fp, arg, val_cnt).id;
             }
 
             ++*val_cnt;
@@ -291,41 +287,36 @@ int gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
 
             break;
         case NodeKind.ASSIGN:
-            char[] lhs_name = gen_llvm_ir_expr_lval(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
-            fprintf(fp, "  store i32 %%%d, i32* %%%.*s\n", rhs_id, lhs_name.length, lhs_name.ptr);
+            Reg lhs_reg = gen_llvm_ir_expr_lval(fp, node.lhs, val_cnt);
+            Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
+            fprintf(fp, "  store i32 %%%d, i32* %%%.*s\n", rhs_reg.id, lhs_reg.str.length, lhs_reg.str.ptr);
             ++*val_cnt;
-            fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n", *val_cnt, lhs_name.length, lhs_name.ptr);
+            fprintf(fp, "  %%%d = load i32, i32* %%%.*s\n", *val_cnt, lhs_reg.str.length, lhs_reg.str.ptr);
             break;
         default:
             fprintf(stderr, "サポートしていないノードの種類です\n");
             exit(1);
             break;
-
-        Lzext:
-            fprintf(fp, "  %%%d = zext i1 %%%d to i32\n", *val_cnt + 1, *val_cnt);
-            ++*val_cnt;
-            break;
     }
 
-    return *val_cnt;
+    return make_reg_id(*val_cnt);
 }
 
 
-char[] gen_llvm_ir_expr_lval(FILE* fp, Node* node, int* val_cnt)
+Reg gen_llvm_ir_expr_lval(FILE* fp, Node* node, int* val_cnt)
 {
     if(node.kind != NodeKind.LVAR && node.kind != NodeKind.ASSIGN)
         error("代入の左辺値が変数ではありません");
 
     switch(node.kind) {
         case NodeKind.LVAR:
-            return node.token.str;
+            return make_reg_str(node.token.str);
         
         case NodeKind.ASSIGN:
-            char[] lhs_name = gen_llvm_ir_expr_lval(fp, node.lhs, val_cnt);
-            int rhs_id = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
-            fprintf(fp, "  store i32 %%%d, i32* %%%.*s\n", rhs_id, lhs_name.length, lhs_name.ptr);
-            return lhs_name;
+            Reg lhs_reg = gen_llvm_ir_expr_lval(fp, node.lhs, val_cnt);
+            Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
+            fprintf(fp, "  store i32 %%%d, i32* %%%.*s\n", rhs_reg.id, lhs_reg.str.length, lhs_reg.str.ptr);
+            return lhs_reg;
 
         default:
             fprintf(stderr, "サポートしていないノードの種類です\n");
@@ -333,7 +324,7 @@ char[] gen_llvm_ir_expr_lval(FILE* fp, Node* node, int* val_cnt)
             break;
     }
 
-    return null;
+    return make_reg_str(null);
 }
 
 
@@ -368,4 +359,51 @@ void gen_llvm_ir_store(FILE* fp, Variable v, int reg_id)
     fprintf(fp, " %%%d, ", reg_id);
     gen_llvm_ir_type(fp, v.type);
     fprintf(fp, "* %%%.*s\n", v.token.str.length, v.token.str.ptr);
+}
+
+
+Reg gen_llvm_ir_icmp(FILE* fp, NodeKind op_kind, int lhs_id, int rhs_id, int* val_cnt)
+{
+    int result_i8_id = ++*val_cnt;
+
+    switch(op_kind) {
+        case NodeKind.EQ:
+            fprintf(fp, "  %%%d = icmp eq i32 %%%d, %%%d\n", result_i8_id, lhs_id, rhs_id);
+            break;
+        case NodeKind.NE:
+            fprintf(fp, "  %%%d = icmp ne i32 %%%d, %%%d\n", result_i8_id, lhs_id, rhs_id);
+            break;
+        case NodeKind.LT:
+            fprintf(fp, "  %%%d = icmp slt i32 %%%d, %%%d\n", result_i8_id, lhs_id, rhs_id);
+            break;
+        case NodeKind.LE:
+            fprintf(fp, "  %%%d = icmp sle i32 %%%d, %%%d\n", result_i8_id, lhs_id, rhs_id);
+            break;
+        case NodeKind.GT:
+            fprintf(fp, "  %%%d = icmp sgt i32 %%%d, %%%d\n", result_i8_id, lhs_id, rhs_id);
+            break;
+        case NodeKind.GE:
+            fprintf(fp, "  %%%d = icmp sge i32 %%%d, %%%d\n", result_i8_id, lhs_id, rhs_id);
+            break;
+        default:
+            error("'op_kind = %d': 比較演算子ではありません", cast(int)op_kind);
+            break;
+    }
+
+    return make_reg_id(result_i8_id);
+}
+
+Reg gen_llvm_ir_init_i32_reg(FILE* fp, int value, int* val_cnt)
+{
+    ++*val_cnt;
+    fprintf(fp, "  %%%d = add i32 0, %d\n", *val_cnt, value);
+    return make_reg_id(*val_cnt);
+}
+
+
+Reg gen_llvm_ir_icmp_ne_0(FILE* fp, int lhs_id, int* val_cnt)
+{
+    ++*val_cnt;
+    fprintf(fp, "  %%%d = icmp ne i32 %%%d, 0\n", *val_cnt, lhs_id);
+    return make_reg_id(*val_cnt);
 }
