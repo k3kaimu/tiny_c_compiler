@@ -208,6 +208,23 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             }
             assert(0);
             break;
+
+        case NodeKind.PRE_INC:
+        case NodeKind.PRE_DEC:
+        case NodeKind.POST_INC:
+        case NodeKind.POST_DEC:
+            semantic_analysis_node(node.lhs, env, func, program);
+            if(! node.lhs.type.islval) {
+                error_at(node.token.str.ptr, "インクリメント演算子が右辺値に適用されています");
+                return;
+            }
+            node.type = node.lhs.type;
+            if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.PRE_DEC)
+                node.type.islval = true;
+            else
+                node.type.islval = false;
+            return;
+        
         case NodeKind.EXPR_STMT:
             semantic_analysis_node(node.lhs, env, func, program);
             return;
@@ -304,12 +321,6 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             if(!is_breakable(env)) {
                 error("ループの外なのでbreakできません");
             }
-            return;
-
-        case NodeKind.SIZEOF:
-            semantic_analysis_node(node.lhs, env, func, program);
-            node.type = make_int_type();
-            node.val = sizeof_type(node.lhs.type);
             return;
 
         case NodeKind.FUNC_DEF:

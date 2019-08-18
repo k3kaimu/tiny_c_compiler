@@ -98,6 +98,17 @@ unittest
     assert(test("int _=1; int __=2; int _a=3; int a_b=4; return _+__+_a+a_b;", 10));
     assert(test("return 1;", 1));
     assert(test("int a = 12; return a+a; a+2;", 24));
+    assert(test("int a = 12; int b = ++a; return b + a;", 26));
+    assert(test("int a = 12; int b = a++; return b + a;", 25));
+    assert(test("int a = 12; int b = ++ ++a; return b + a;", 28));
+    assert(test("int a = 12; int b = (++a)++; return b + a;", 27));
+    assert(test("int a = 12; ++((++a) = 14); return a;", 15));
+    assert(test("int a = 12; int b = --a; return b + a;", 22));
+    assert(test("int a = 12; int b = a--; return b + a;", 23));
+    assert(test("int a = 12; int b = -- --a; return b + a;", 20));
+    assert(test("int a = 12; int b = (--a)--; return b + a;", 21));
+    assert(test("int a = 12; --((--a) = 14); return a;", 13));
+    assert(test("int a; int b; a = b = 12; return a + b;", 24));
     assert(test("int a = 1; if(1 == 1) a = 4; return a;", 4));
     assert(test("int a = 1; if(1 == 1) a = 4; else a = 8; return a;", 4));
     assert(test("int a=1; int b=2; if(1 == 0) b = 0; else a = 8; return a+b;", 10));

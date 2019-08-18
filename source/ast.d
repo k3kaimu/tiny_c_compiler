@@ -19,6 +19,10 @@ enum NodeKind
     GE,         // >=
     ASSIGN,     // =
     DOT,        // .
+    PRE_INC,    // ++
+    PRE_DEC,    // --
+    POST_INC,   // ++
+    POST_DEC,   // --
     CAST,       // キャスト
     LVAR,       // ローカル変数
     NUM,        // 整数
@@ -444,14 +448,33 @@ Node* mul()
 }
 
 
-// unary = ("+" | "-")? postfix
+// unary = ("+" | "-")? unary
+//       | ("++" | "--")? unary
 //       | "cast" "(" type ")" unary
 Node* unary()
 {
-    if(consume_reserved("+"))
-        return postfix();
+    auto tk = token;
+
+    if(consume_reserved("++"))
+    {
+        Node* node = new Node;
+        node.token = tk;
+        node.kind = NodeKind.PRE_INC;
+        node.lhs = unary();
+        return node;
+    }
+    else if(consume_reserved("--"))
+    {
+        Node* node = new Node;
+        node.token = tk;
+        node.kind = NodeKind.PRE_DEC;
+        node.lhs = unary();
+        return node;
+    }
+    else if(consume_reserved("+"))
+        return unary();
     else if(consume_reserved("-"))
-        return new_node(NodeKind.SUB, new_node_num(null, 0), postfix());
+        return new_node(NodeKind.SUB, new_node_num(null, 0), unary());
     else if(consume(TokenKind.CAST)) {
         expect("(");
         Type* ty = type().type;
@@ -465,6 +488,8 @@ Node* unary()
 
 
 // postfix = term
+//         | postfix "++"
+//         | postfix "--"
 //         | postfix "." ident
 Node* postfix()
 {
@@ -472,6 +497,24 @@ Node* postfix()
 
     while(1) {
         Token* tk = token;
+
+        if(consume_reserved("++")) {
+            Node* new_node = new Node;
+            new_node.token = tk;
+            new_node.kind = NodeKind.POST_INC;
+            new_node.lhs = lhs;
+            lhs = new_node;
+            continue;
+        }
+
+        if(consume_reserved("--")) {
+            Node* new_node = new Node;
+            new_node.token = tk;
+            new_node.kind = NodeKind.POST_DEC;
+            new_node.lhs = lhs;
+            lhs = new_node;
+            continue;
+        }
 
         if(consume_reserved(".")) {
             Node* new_node = new Node;

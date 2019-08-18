@@ -19,7 +19,7 @@ RegType make_llvm_ir_reg_type(Type* type)
     RegType ret;
 
     if(type.kind == TypeKind.POINTER) {
-        ret.str = make_llvm_ir_reg_type(type.nested).str ~ "*";
+        ret = ref_reg_type(make_llvm_ir_reg_type(type.nested));
     } else {
         if(type.str == "char" || type.str == "bool" || type.str == "byte")
             ret.str = "i8";
@@ -49,6 +49,24 @@ int sizeof_reg_type(RegType type)
 
     assert(0, "Unknown type");
     return -1;
+}
+
+
+RegType deref_reg_type(RegType ty)
+{
+    assert(ty.str[$-1] == '*');
+
+    RegType ret = ty;
+    ret.str = ret.str[0 .. $-1];
+    return ret;
+}
+
+
+RegType ref_reg_type(RegType ty)
+{
+    RegType ret = ty;
+    ret.str = ret.str ~ '*';
+    return ret;
 }
 
 
@@ -105,8 +123,7 @@ Reg make_reg_str(RegType type, const(char)[] str)
 Reg make_reg_from_Variable(Variable v)
 {
     RegType ty = make_llvm_ir_reg_type(v.type);
-    ty.str ~= "*";
-    return make_reg_str(ty, v.token.str);
+    return make_reg_str(ref_reg_type(ty), v.token.str);
 }
 
 
@@ -245,7 +262,7 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
         return;
     } else if (node.kind == NodeKind.RETURN) {
         Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
-        gen_llvm_ir_store(fp, lhs_reg, make_reg_str(RegType(ret_type.str ~ "*"), "__ret_var"));
+        gen_llvm_ir_store(fp, lhs_reg, make_reg_str(ref_reg_type(ret_type), "__ret_var"));
         fprintf(fp, "  br label %%LRET\n\n");
         ++*val_cnt;     // ret命令はBasic Blockを作るので，そのラベルを回避する
         fprintf(fp, "; <label>:%%%d:\n", *val_cnt);
@@ -292,11 +309,8 @@ void gen_llvm_ir_stmt(FILE* fp, Node* node, int* val_cnt, int* loop_cnt, int* bl
                 gen_llvm_ir_expr(fp, node.update_expr, val_cnt);
         } else {                        // foreach
             Reg value_of_loop_var_reg = gen_llvm_ir_load(fp, make_reg_from_Variable(node.def_loop_var.def_var), val_cnt);
-            int next_value_id = ++*val_cnt;
-            fprintf(fp, "  %%%d = add ", next_value_id);
-            gen_llvm_ir_reg_with_type(fp, value_of_loop_var_reg);
-            fprintf(fp, ", 1\n");
-            gen_llvm_ir_store(fp, make_reg_id(value_of_loop_var_reg.type, next_value_id), make_reg_from_Variable(node.def_loop_var.def_var));
+            Reg next_val = gen_llvm_ir_binop_const(fp, "add", value_of_loop_var_reg, 1, val_cnt);
+            gen_llvm_ir_store(fp, next_val, make_reg_from_Variable(node.def_loop_var.def_var));
         }
 
         fprintf(fp, "  br label %%LFOR%d.cond\n\n", this_loop_id);
@@ -375,9 +389,7 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
 
         case NodeKind.LVAR:
             RegType ty = make_llvm_ir_reg_type(node.type);
-            RegType pty;
-            pty.str = ty.str ~ "*";
-            gen_llvm_ir_load(fp, make_reg_str(pty, node.token.str), val_cnt);
+            gen_llvm_ir_load(fp, make_reg_str(ref_reg_type(ty), node.token.str), val_cnt);
             return make_reg_id(ty, *val_cnt);
 
         case NodeKind.FUNC_CALL:
@@ -407,9 +419,7 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
             gen_llvm_ir_store(fp, rhs_reg, lhs_reg);
             gen_llvm_ir_load(fp, lhs_reg, val_cnt);
-            RegType ty = lhs_reg.type;
-            ty.str = ty.str[0 .. $-1];      // dereference
-            return make_reg_id(ty, *val_cnt);
+            return make_reg_id(deref_reg_type(lhs_reg.type), *val_cnt);
 
         case NodeKind.CAST:
             assert(is_integer_type(node.type) || is_pointer_type(node.type));
@@ -438,6 +448,25 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
                 return make_reg_id(ty, *val_cnt);
             }
             break;
+        case NodeKind.PRE_INC:
+        case NodeKind.PRE_DEC:
+        case NodeKind.POST_INC:
+        case NodeKind.POST_DEC:
+            Reg lhs = gen_llvm_ir_expr_lval(fp, node.lhs, val_cnt);
+            Reg lhs_val = gen_llvm_ir_load(fp, lhs, val_cnt);
+
+            Reg lhs_inc;
+            if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.POST_INC)
+                lhs_inc = gen_llvm_ir_binop_const(fp, "add", lhs_val, 1, val_cnt);
+            else
+                lhs_inc = gen_llvm_ir_binop_const(fp, "sub", lhs_val, 1, val_cnt);
+
+            gen_llvm_ir_store(fp, lhs_inc, lhs);
+            if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.PRE_DEC)
+                return lhs_inc;
+            else
+                return lhs_val;
+
         default:
             error("サポートしていないノードの種類です");
             break;
@@ -449,24 +478,34 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
 
 Reg gen_llvm_ir_expr_lval(FILE* fp, Node* node, int* val_cnt)
 {
-    if(node.kind != NodeKind.LVAR && node.kind != NodeKind.ASSIGN)
-        error("代入の左辺値が変数ではありません");
-
     switch(node.kind) {
+        case NodeKind.PRE_INC:
+        case NodeKind.PRE_DEC:
+            Reg lhs = gen_llvm_ir_expr_lval(fp, node.lhs, val_cnt);
+            Reg lhs_val = gen_llvm_ir_load(fp, lhs, val_cnt);
+
+            Reg lhs_inc;
+            if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.POST_INC)
+                lhs_inc = gen_llvm_ir_binop_const(fp, "add", lhs_val, 1, val_cnt);
+            else
+                lhs_inc = gen_llvm_ir_binop_const(fp, "sub", lhs_val, 1, val_cnt);
+
+            gen_llvm_ir_store(fp, lhs_inc, lhs);
+            return lhs;
+
         case NodeKind.LVAR:
             RegType ty = make_llvm_ir_reg_type(node.type);
-            ty.str ~= "*";
-            return make_reg_str(ty, node.token.str);
+            return make_reg_str(ref_reg_type(ty), node.token.str);
         
         case NodeKind.ASSIGN:
             Reg lhs_reg = gen_llvm_ir_expr_lval(fp, node.lhs, val_cnt);
             Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
-            assert(lhs_reg.type.str == rhs_reg.type.str);
+            assert(deref_reg_type(lhs_reg.type).str == rhs_reg.type.str);
             gen_llvm_ir_store(fp, rhs_reg, lhs_reg);
             return lhs_reg;
 
         default:
-            error("サポートしていないノードの種類です");
+            error("左辺値が得られないノードの種類です");
             break;
     }
 
@@ -486,14 +525,14 @@ Reg gen_llvm_ir_alloca(FILE* fp, Type* ty, const(char)[] lvarname)
         sizeof_type(ty)
         );
 
-    reg.type.str = reg.type.str ~ "*";
+    reg.type = ref_reg_type(reg.type);
     return reg;
 }
 
 
 void gen_llvm_ir_store(FILE* fp, Reg src, Reg dst)
 {
-    if(!is_pointer(dst) || dst.type.str[0 .. $-1] != src.type.str) {
+    if(!is_pointer(dst) || deref_reg_type(dst.type).str != src.type.str) {
         error("gen_llvm_ir_store: 型が一致しません． typeof(dst) = %.*s, typeof(src) = %.*s",
             dst.type.str.length, dst.type.str.ptr,
             src.type.str.length, src.type.str.ptr,
@@ -518,7 +557,7 @@ Reg gen_llvm_ir_load(FILE* fp, Reg src, int* val_cnt)
         );
     }
 
-    string deref_type = src.type.str[0 .. $-1];
+    string deref_type = deref_reg_type(src.type).str;
     fprintf(fp, "  %%%d = load %.*s, ",
         *val_cnt,
         deref_type.length, deref_type.ptr,
@@ -625,4 +664,17 @@ Reg gen_llvm_ir_pointer_cast(FILE* fp, RegType ty, Reg val, int* val_cnt)
     );
 
     return make_reg_id(ty, *val_cnt);
+}
+
+
+Reg gen_llvm_ir_binop_const(FILE* fp, string op, Reg val, long v, int* val_cnt)
+{
+    fprintf(fp, "  %%%d = %.*s ",
+        ++*val_cnt,
+        op.length, op.ptr,
+    );
+    gen_llvm_ir_reg_with_type(fp, val);
+    fprintf(fp, ", %lld\n", v);
+
+    return make_reg_id(val.type, *val_cnt);
 }

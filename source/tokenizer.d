@@ -233,14 +233,13 @@ Token* tokenize(char[] str)
             continue;
         }
 
-        if(size_t len = starts_with_reserved(str, "sizeof")) {
-            cur = new_token(TokenKind.SIZEOF, cur, str[0 .. len]);
-            str = str[len .. $];
-            continue;
-        }
-
         if(str.length >= 2) {
-            if(str[0 .. 2] == "==" || str[0 .. 2] == "!=" || str[0 .. 2] == "<=" || str[0 .. 2] == ">=" || str[0 .. 2] == "..") {
+            if( str[0 .. 2] == "==" || str[0 .. 2] == "!="
+             || str[0 .. 2] == "<=" || str[0 .. 2] == ">="
+             || str[0 .. 2] == ".."
+             || str[0 .. 2] == "++" || str[0 .. 2] == "--"
+            )
+            {
                 cur = new_token(TokenKind.RESERVED, cur, str[0 .. 2]);
                 str = str[2 .. $];
                 continue;
