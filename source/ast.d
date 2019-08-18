@@ -92,6 +92,7 @@ struct Node
     Node*[] func_def_body;
 
     Type* type;                 // TYPE か exprのときのみ使う
+    bool islval;                // expr のときのみ使う
     Variable def_var;           // kindがLVAR_DEFのときのみ使う
 }
 

@@ -202,7 +202,7 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             semantic_analysis_node(node.lhs, env, func, program);
             semantic_analysis_node(node.rhs, env, func, program);
 
-            if(!node.lhs.type.islval)
+            if(!node.lhs.islval)
                 error("右辺値に代入できません");
 
             if(!is_assignable_type(node.lhs.type, node.rhs.type)) {
@@ -216,7 +216,7 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
                 node.rhs = new_node_cast_with_check(node.lhs.type, node.rhs);
 
             node.type = node.lhs.type;
-            node.type.islval = true;
+            node.islval = true;
             return;
 
         case NodeKind.CAST:
@@ -231,7 +231,7 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             }
 
             node.type = def.type;
-            node.type.islval = true;
+            node.islval = true;
             return;
 
         case NodeKind.NUM:
@@ -301,7 +301,7 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
                 node.index_expr1 = new_node_cast_with_check(ty_long, node.index_expr1);
 
             node.type = make_deref_type_of(node.lhs.type);
-            node.type.islval = true;
+            node.islval = true;
             return;
 
         case NodeKind.SLICE:
@@ -312,26 +312,23 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
         case NodeKind.POST_INC:
         case NodeKind.POST_DEC:
             semantic_analysis_node(node.lhs, env, func, program);
-            if(! node.lhs.type.islval) {
+            if(! node.lhs.islval) {
                 error_at(node.token.str.ptr, "インクリメント演算子が右辺値に適用されています");
                 return;
             }
             node.type = node.lhs.type;
             if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.PRE_DEC)
-                node.type.islval = true;
-            else
-                node.type.islval = false;
+                node.islval = true;
             return;
 
         case NodeKind.PTR_REF:
             semantic_analysis_node(node.lhs, env, func, program);
-            if(! node.lhs.type.islval) {
+            if(! node.lhs.islval) {
                 error_at(node.token.str.ptr, "アドレス演算子が右辺値に適用されています");
                 return;
             }
 
             node.type = make_ref_type_of(node.lhs.type);
-            node.type.islval = false;
             return;
 
         case NodeKind.PTR_DEREF:
@@ -342,7 +339,7 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             }
 
             node.type = make_deref_type_of(node.lhs.type);
-            node.type.islval = true;
+            node.islval = true;
             return;
 
         case NodeKind.EXPR_STMT:

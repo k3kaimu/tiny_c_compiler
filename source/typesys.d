@@ -9,7 +9,6 @@ enum TypeKind
 struct Type
 {
     TypeKind kind;
-    bool islval;
     const(char)[] str;
     Type* nested;
 }
@@ -19,7 +18,6 @@ Type* make_basic_type(const(char)[] str)
 {
     Type* ty = new Type;
     ty.kind = TypeKind.BASE;
-    ty.islval = false;
     ty.str = str;
     ty.nested = null;
     return ty;
@@ -30,7 +28,6 @@ Type* make_bool_type()
 {
     Type* ty = new Type;
     ty.kind = TypeKind.BASE;
-    ty.islval = false;
     ty.str = "bool";
     ty.nested = null;
     return ty;
@@ -41,7 +38,6 @@ Type* make_int_type()
 {
     Type* ty = new Type;
     ty.kind = TypeKind.BASE;
-    ty.islval = false;
     ty.str = "int";
     ty.nested = null;
     return ty;
