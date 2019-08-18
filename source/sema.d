@@ -92,6 +92,67 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
     final switch(node.kind) {
         case NodeKind.ADD:
         case NodeKind.SUB:
+            semantic_analysis_node(node.lhs, env, func, program);
+            semantic_analysis_node(node.rhs, env, func, program);
+
+            if(is_integer_type(node.lhs.type) && is_integer_type(node.rhs.type)) {
+                Type* comty = common_type_of(node.lhs.type, node.rhs.type);
+
+                if(!is_same_type(node.lhs.type, comty))
+                    node.lhs = new_node_cast_with_check(comty, node.lhs);
+
+                if(!is_same_type(node.rhs.type, comty))
+                    node.rhs = new_node_cast_with_check(comty, node.rhs);
+
+                node.type = comty;
+                return;
+            } else {
+                // pointer + integer
+                // pointer - integer
+                if(is_pointer_type(node.lhs.type) && is_integer_type(node.rhs.type)) {
+                    node.type = node.lhs.type;
+                    return;
+                }
+                // integer + pointer
+                // integer - pointer
+                else if(is_integer_type(node.lhs.type) && is_pointer_type(node.rhs.type)) {
+                    if(node.kind == NodeKind.SUB)
+                        goto LNotAllow;
+
+                    node.type = node.rhs.type;
+                    return;
+                }
+                // pointer + pointer
+                // pointer - pointer
+                else if(is_pointer_type(node.lhs.type) && is_pointer_type(node.rhs.type)) {
+                    if(node.kind == NodeKind.ADD)
+                        goto LNotAllow;
+
+                    if(!is_same_type(node.lhs.type, node.rhs.type))
+                        goto LNotAllow;
+
+                    node.type = make_basic_type("long");
+                    return;
+                }
+                else {
+                    goto LNotAllow;
+                }
+            }
+          LNotAllow:
+            if(node.kind == NodeKind.ADD) {
+                error("許可されていない演算です: '%.*s' + '%.*s'",
+                    node.lhs.type.str.length, node.lhs.type.str.ptr,
+                    node.rhs.type.str.length, node.rhs.type.str.ptr,
+                );
+            } else {
+                error("許可されていない演算です: '%.*s' - '%.*s'",
+                    node.lhs.type.str.length, node.lhs.type.str.ptr,
+                    node.rhs.type.str.length, node.rhs.type.str.ptr,
+                );
+            }
+
+            return;
+
         case NodeKind.MUL:
         case NodeKind.DIV:
         case NodeKind.REM:

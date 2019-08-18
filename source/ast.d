@@ -724,45 +724,39 @@ Node* type()
 }
 
 
-// basic_type = char | byte | short | int | long | ident
+// basic_type = void | bool | char | byte | short | int | long | ident
 Type* basic_type()
 {
-    Type* ty = new Type;
-    ty.kind = TypeKind.BASE;
+    if(consume(TokenKind.VOID)) {
+        return make_basic_type("void");
+    }
 
     if(consume(TokenKind.BOOL)) {
-        ty.str = "bool";
-        return ty;
+        return make_basic_type("bool");
     }
 
     if(consume(TokenKind.CHAR)) {
-        ty.str = "char";
-        return ty;
+        return make_basic_type("char");
     }
 
     if(consume(TokenKind.BYTE)) {
-        ty.str = "byte";
-        return ty;
+        return make_basic_type("byte");
     }
 
     if(consume(TokenKind.SHORT)) {
-        ty.str = "short";
-        return ty;
+        return make_basic_type("short");
     }
 
     if(consume(TokenKind.INT)) {
-        ty.str = "int";
-        return ty;
+        return make_basic_type("int");
     }
 
     if(consume(TokenKind.LONG)) {
-        ty.str = "long";
-        return ty;
+        return make_basic_type("long");
     }
 
     if(Token* tok = consume_ident()) {
-        ty.str = tok.str;
-        return ty;
+        return make_basic_type(tok.str);
     }
 
     error_at(token.str.ptr, "型ではありません");

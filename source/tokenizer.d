@@ -17,6 +17,7 @@ enum TokenKind
     BREAK,          // break
     FOREACH,        // foreach
     AUTO,           // auto
+    VOID,           // void
     BOOL,           // bool
     CHAR,           // char
     BYTE,           // byte
@@ -190,6 +191,12 @@ Token* tokenize(char[] str)
 
         if(size_t len = starts_with_reserved(str, "auto")) {
             cur = new_token(TokenKind.AUTO, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "void")) {
+            cur = new_token(TokenKind.VOID, cur, str[0 .. len]);
             str = str[len .. $];
             continue;
         }

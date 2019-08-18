@@ -19,9 +19,15 @@ RegType make_llvm_ir_reg_type(Type* type)
     RegType ret;
 
     if(type.kind == TypeKind.POINTER) {
-        ret = ref_reg_type(make_llvm_ir_reg_type(type.nested));
+        RegType nested = make_llvm_ir_reg_type(type.nested);
+        if(nested.str == "void")
+            return ref_reg_type(RegType("i8"));
+        else
+            return ref_reg_type(nested);
     } else {
-        if(type.str == "char" || type.str == "bool" || type.str == "byte")
+        if(type.str == "void")
+            ret.str = "void";
+        else if(type.str == "char" || type.str == "bool" || type.str == "byte")
             ret.str = "i8";
         else if(type.str == "short")
             ret.str = "i16";
@@ -84,6 +90,14 @@ bool is_pointer(Reg reg)
 }
 
 
+bool is_integer(Reg reg)
+{
+    string s = reg.type.str;
+
+    return (s == "i1" || s == "i8" || s == "i16" || s == "i32" || s == "i64") ;
+}
+
+
 void gen_llvm_ir_reg_with_type(FILE* fp, Reg reg)
 {
     if(reg.str) {
@@ -96,6 +110,16 @@ void gen_llvm_ir_reg_with_type(FILE* fp, Reg reg)
             reg.type.str.length, reg.type.str.ptr,
             reg.id
         );
+    }
+}
+
+
+void gen_llvm_ir_reg(FILE* fp, Reg reg)
+{
+    if(reg.str) {
+        fprintf(fp, "%%%.*s", reg.str.length, reg.str.ptr);
+    } else {
+        fprintf(fp, "%%%d", reg.id);
     }
 }
 
@@ -374,6 +398,7 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
         case NodeKind.REM:
             Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
             Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
+            if(is_integer(lhs_reg) && is_integer(rhs_reg)) {
             assert(lhs_reg.type.str == rhs_reg.type.str);
 
             fprintf(fp, "  %%%d = ", ++*val_cnt);
@@ -394,6 +419,22 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
                 fprintf(fp, ", %%%.*s\n", rhs_reg.str.length, rhs_reg.str.ptr);
 
             return make_reg_id(lhs_reg.type, *val_cnt);
+            } else if(is_pointer(lhs_reg) && is_integer(rhs_reg)) {
+                if(node.kind == NodeKind.SUB)
+                    rhs_reg = gen_llvm_ir_binop_const(fp, "mul", rhs_reg, -1, val_cnt);
+                return gen_llvm_ir_getelementptr_inbounds(fp, lhs_reg, rhs_reg, val_cnt);
+            } else if(is_integer(lhs_reg) && is_pointer(rhs_reg)) {
+                assert(node.kind != NodeKind.SUB);
+
+                return gen_llvm_ir_getelementptr_inbounds(fp, rhs_reg, lhs_reg, val_cnt);
+            } else if(is_pointer(lhs_reg) && is_pointer(rhs_reg)) {
+                assert(node.kind != NodeKind.ADD);
+                assert(lhs_reg.type.str == rhs_reg.type.str);
+
+                return gen_llvm_ir_distance_of_pointers(fp, lhs_reg, rhs_reg, val_cnt);
+            } else {
+                assert(0);
+            }
 
         case NodeKind.EQ:
         case NodeKind.NE:
@@ -425,9 +466,11 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
 
             RegType ret_reg_type = make_llvm_ir_reg_type(node.type);
 
-            ++*val_cnt;
-            fprintf(fp, "  %%%d = call %.*s @%.*s(",
-                *val_cnt,
+            if(ret_reg_type.str != "void") {
+                fprintf(fp, "  %%%d = ", ++*val_cnt);
+            }
+
+            fprintf(fp, "call %.*s @%.*s(",
                 ret_reg_type.str.length, ret_reg_type.str.ptr,
                 node.token.str.length, node.token.str.ptr,
             );
@@ -437,7 +480,11 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
                     fprintf(fp, ", ");
             }
             fprintf(fp, ")\n");
+
+            if(ret_reg_type.str != "void")
             return make_reg_id(ret_reg_type, *val_cnt);
+            else
+                return make_reg_id(ret_reg_type, -1);
 
         case NodeKind.ASSIGN:
             Reg lhs_reg = gen_llvm_ir_expr_lval(fp, node.lhs, val_cnt);
@@ -735,4 +782,59 @@ Reg gen_llvm_ir_binop_const(FILE* fp, string op, Reg val, long v, int* val_cnt)
     fprintf(fp, ", %lld\n", v);
 
     return make_reg_id(val.type, *val_cnt);
+}
+
+
+Reg gen_llvm_ir_binop(FILE* fp, string op, Reg lhs, Reg rhs, int* val_cnt)
+{
+    assert(lhs.type.str == rhs.type.str);
+
+    fprintf(fp, "  %%%d = %.*s ",
+        ++*val_cnt,
+        op.length, op.ptr,
+    );
+    gen_llvm_ir_reg_with_type(fp, lhs);
+    fprintf(fp, ", ");
+    gen_llvm_ir_reg(fp, rhs);
+    fprintf(fp, "\n");
+
+    return make_reg_id(lhs.type, *val_cnt);
+}
+
+
+Reg gen_llvm_ir_getelementptr_inbounds(FILE* fp, Reg ptr, Reg offset, int* val_cnt)
+{
+    RegType deref_type = deref_reg_type(ptr.type);
+
+    fprintf(fp, "  %%%d = getelementptr inbounds %.*s, ",
+        ++*val_cnt,
+        deref_type.str.length, deref_type.str.ptr,
+    );
+    gen_llvm_ir_reg_with_type(fp, ptr);
+    fprintf(fp, ", ");
+    gen_llvm_ir_reg_with_type(fp, offset);
+    fprintf(fp, "\n");
+
+    return make_reg_id(ptr.type, *val_cnt);
+}
+
+
+Reg gen_llvm_ir_ptr_to_i64(FILE* fp, Reg ptr, int* val_cnt)
+{
+    assert(is_pointer(ptr));
+
+    fprintf(fp, "  %%%d = ptrtoint ", ++*val_cnt);
+    gen_llvm_ir_reg_with_type(fp, ptr);
+    fprintf(fp, " to i64\n");
+
+    return make_reg_id(RegType("i64"), *val_cnt);
+}
+
+
+Reg gen_llvm_ir_distance_of_pointers(FILE* fp, Reg lhs, Reg rhs, int* val_cnt)
+{
+    Reg lhs_i64 = gen_llvm_ir_ptr_to_i64(fp, lhs, val_cnt);
+    Reg rhs_i64 = gen_llvm_ir_ptr_to_i64(fp, rhs, val_cnt);
+    Reg diff = gen_llvm_ir_binop(fp, "sub", lhs_i64, rhs_i64, val_cnt);
+    return gen_llvm_ir_binop_const(fp, "sdiv exact", diff, sizeof_reg_type(deref_reg_type(lhs.type)), val_cnt);
 }

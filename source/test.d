@@ -227,19 +227,98 @@ unittest
     assert(test_with_report(get_ir(code), 144));
 }
 
-// mallocテスト
+// exit, mallocテスト
 unittest
 {
     auto code = q{
-        extern(C) char* malloc(long);
+        extern(C) void exit(int);
         
         int main()
         {
-            auto buf = cast(int*) malloc(10 * 4);
-            *buf = 12;
-            return *buf;
+            exit(12);
+            return 0;
         }
     }; 
 
     assert(test_with_report(get_ir(code), 12));
+
+
+    code = q{
+        extern(C) void* malloc(long);
+
+        int main()
+        {
+            Ptr!int buf = cast(int*) malloc(10 * 4);
+            Ptr!int pa = buf;
+            Ptr!int pb = buf + 10;
+            long diff = pb - pa;
+            if(diff != 10)
+                return 1;
+
+            pa = pa + 1;
+            *pa = 10;
+            if(*(buf + 1) != 10)
+                return 1;
+
+            int i = 0;
+            pa = buf;
+            for(; pa < pb; pa = pa + 1) {
+                *pa = i;
+                ++i;
+            }
+
+            for(int i = 0; i < 10; ++i) {
+                if(*(buf + i) != i)
+                    return 1;
+            }
+
+            return 0;
+        }
+    };
+
+    assert(test_with_report(get_ir(code), 0));
+
+    code = q{
+        int set_value(int lhs, int* rhs)
+        {
+            *rhs = lhs;
+        }
+
+
+        int main()
+        {
+            int val = 0;
+            set_value(12, &val);
+            return val;
+        }
+    };
+    assert(test_with_report(get_ir(code), 12));
+
+
+    code = q{
+        extern(C) void* malloc(long);
+
+        int fib(int n, int* mem, int* mem_max)
+        {
+            if(n <= *mem_max)
+                return *(mem + n);
+
+            int v = fib(n-1, mem, mem_max) + fib(n-2, mem, mem_max);
+            *(mem + n) = v;
+            *mem_max = n;
+
+            return v;
+        }
+
+        int main() {
+            auto memory = cast(int*) malloc(100 * 4);
+            int mem_max = 1;
+            *(memory + 0) = 0;
+            *(memory + 1) = 1;
+
+            return fib(12, memory, &mem_max);
+        }
+    };
+
+    assert(test_with_report(get_ir(code), 144));
 }
