@@ -264,7 +264,7 @@ unittest
             pa = pa + 1;
             *pa = 10;
             if(*(buf + 1) != 10)
-                return 1;
+                return 2;
 
             int i = 0;
             pa = buf;
@@ -275,21 +275,44 @@ unittest
 
             for(int i = 0; i < 10; ++i) {
                 if(*(buf + i) != i)
-                    return 1;
+                    return 3;
             }
 
             pa = 1 + buf;
             if(pa != &*(buf + 1))
-                return 1;
+                return 4;
 
             pa = pa - 1;
             if(pa != buf)
-                return 1;
+                return 5;
+
+            pa = buf;
+            pb = ++pa;
+            if(pa != pb)
+                return 6;
+
+            if(pa != &*(buf + 1))
+                return 7;
+
+            pb = pa++;
+            if(pa == pb || pa != &*(buf + 2))
+                return 8;
+
+            pb = --pa;
+            if(pa != pb || pa != &*(buf + 1))
+                return 9;
+
+            pb = pa--;
+            if(pa == pb || pa != buf || pb != &*(buf + 1))
+                return 10;
+
+            if(pb != &*(buf + 1))
+                return 11;
 
             if(buf)
                 return 0;
             else
-                return 1;
+                return 12;
         }
     };
 

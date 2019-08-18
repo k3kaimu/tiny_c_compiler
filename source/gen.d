@@ -554,10 +554,18 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             Reg lhs_val = gen_llvm_ir_load(fp, lhs, val_cnt);
 
             Reg lhs_inc;
-            if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.POST_INC)
-                lhs_inc = gen_llvm_ir_binop_const(fp, "add", lhs_val, 1, val_cnt);
-            else
-                lhs_inc = gen_llvm_ir_binop_const(fp, "sub", lhs_val, 1, val_cnt);
+
+            if(is_pointer(lhs_val)) {
+                if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.POST_INC)
+                    lhs_inc = gen_llvm_ir_getelementptr_inbounds_const(fp, lhs_val, 1, val_cnt);
+                else
+                    lhs_inc = gen_llvm_ir_getelementptr_inbounds_const(fp, lhs_val, -1, val_cnt);
+            } else {
+                if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.POST_INC)
+                    lhs_inc = gen_llvm_ir_binop_const(fp, "add", lhs_val, 1, val_cnt);
+                else
+                    lhs_inc = gen_llvm_ir_binop_const(fp, "sub", lhs_val, 1, val_cnt);
+            }
 
             gen_llvm_ir_store(fp, lhs_inc, lhs);
             if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.PRE_DEC)
@@ -593,10 +601,17 @@ Reg gen_llvm_ir_expr_lval(FILE* fp, Node* node, int* val_cnt)
             Reg lhs_val = gen_llvm_ir_load(fp, lhs, val_cnt);
 
             Reg lhs_inc;
-            if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.POST_INC)
-                lhs_inc = gen_llvm_ir_binop_const(fp, "add", lhs_val, 1, val_cnt);
-            else
-                lhs_inc = gen_llvm_ir_binop_const(fp, "sub", lhs_val, 1, val_cnt);
+            if(is_pointer(lhs_val)) {
+                if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.POST_INC)
+                    lhs_inc = gen_llvm_ir_getelementptr_inbounds_const(fp, lhs_val, 1, val_cnt);
+                else
+                    lhs_inc = gen_llvm_ir_getelementptr_inbounds_const(fp, lhs_val, -1, val_cnt);
+            } else {
+                if(node.kind == NodeKind.PRE_INC || node.kind == NodeKind.POST_INC)
+                    lhs_inc = gen_llvm_ir_binop_const(fp, "add", lhs_val, 1, val_cnt);
+                else
+                    lhs_inc = gen_llvm_ir_binop_const(fp, "sub", lhs_val, 1, val_cnt);
+            }
 
             gen_llvm_ir_store(fp, lhs_inc, lhs);
             return lhs;
@@ -839,6 +854,21 @@ Reg gen_llvm_ir_getelementptr_inbounds(FILE* fp, Reg ptr, Reg offset, int* val_c
     fprintf(fp, ", ");
     gen_llvm_ir_reg_with_type(fp, offset);
     fprintf(fp, "\n");
+
+    return make_reg_id(ptr.type, *val_cnt);
+}
+
+
+Reg gen_llvm_ir_getelementptr_inbounds_const(FILE* fp, Reg ptr, long offset, int* val_cnt)
+{
+    RegType deref_type = deref_reg_type(ptr.type);
+
+    fprintf(fp, "  %%%d = getelementptr inbounds %.*s, ",
+        ++*val_cnt,
+        deref_type.str.length, deref_type.str.ptr,
+    );
+    gen_llvm_ir_reg_with_type(fp, ptr);
+    fprintf(fp, ", i64 %lld\n", offset);
 
     return make_reg_id(ptr.type, *val_cnt);
 }
