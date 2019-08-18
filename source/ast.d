@@ -23,6 +23,8 @@ enum NodeKind
     PRE_DEC,    // --
     POST_INC,   // ++
     POST_DEC,   // --
+    PTR_REF,    // &
+    PTR_DEREF,  // *
     CAST,       // キャスト
     LVAR,       // ローカル変数
     NUM,        // 整数
@@ -448,7 +450,7 @@ Node* mul()
 }
 
 
-// unary = ("+" | "-")? unary
+// unary = ("+" | "-" | "&" | "*")? unary
 //       | ("++" | "--")? unary
 //       | "cast" "(" type ")" unary
 Node* unary()
@@ -475,6 +477,22 @@ Node* unary()
         return unary();
     else if(consume_reserved("-"))
         return new_node(NodeKind.SUB, new_node_num(null, 0), unary());
+    else if(consume_reserved("&"))
+    {
+        Node* node = new Node;
+        node.token = tk;
+        node.kind = NodeKind.PTR_REF;
+        node.lhs = unary();
+        return node;
+    }
+    else if(consume_reserved("*"))
+    {
+        Node* node = new Node;
+        node.token = tk;
+        node.kind = NodeKind.PTR_DEREF;
+        node.lhs = unary();
+        return node;
+    }
     else if(consume(TokenKind.CAST)) {
         expect("(");
         Type* ty = type().type;

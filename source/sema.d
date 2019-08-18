@@ -225,6 +225,28 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
                 node.type.islval = false;
             return;
         
+        case NodeKind.PTR_REF:
+            semantic_analysis_node(node.lhs, env, func, program);
+            if(! node.lhs.type.islval) {
+                error_at(node.token.str.ptr, "アドレス演算子が右辺値に適用されています");
+                return;
+            }
+
+            node.type = make_ref_type_of(node.lhs.type);
+            node.type.islval = false;
+            return;
+
+        case NodeKind.PTR_DEREF:
+            semantic_analysis_node(node.lhs, env, func, program);
+            if(! is_pointer_type(node.lhs.type)) {
+                error_at(node.token.str.ptr, "間接参照演算子がポインタ値以外に取得されています");
+                return;
+            }
+
+            node.type = make_deref_type_of(node.lhs.type);
+            node.type.islval = true;
+            return;
+
         case NodeKind.EXPR_STMT:
             semantic_analysis_node(node.lhs, env, func, program);
             return;

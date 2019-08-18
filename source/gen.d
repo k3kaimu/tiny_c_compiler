@@ -467,6 +467,16 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             else
                 return lhs_val;
 
+        case NodeKind.PTR_REF:
+            Reg lhs = gen_llvm_ir_expr_lval(fp, node.lhs, val_cnt);
+            return lhs;
+
+        case NodeKind.PTR_DEREF:
+            Reg lhs = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            assert(is_pointer(lhs));
+            Reg lhs_val = gen_llvm_ir_load(fp, lhs, val_cnt);
+            return lhs_val;
+
         default:
             error("サポートしていないノードの種類です");
             break;
@@ -491,6 +501,11 @@ Reg gen_llvm_ir_expr_lval(FILE* fp, Node* node, int* val_cnt)
                 lhs_inc = gen_llvm_ir_binop_const(fp, "sub", lhs_val, 1, val_cnt);
 
             gen_llvm_ir_store(fp, lhs_inc, lhs);
+            return lhs;
+
+        case NodeKind.PTR_DEREF:
+            Reg lhs = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            assert(is_pointer(lhs));
             return lhs;
 
         case NodeKind.LVAR:

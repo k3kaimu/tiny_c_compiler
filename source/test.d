@@ -165,6 +165,13 @@ unittest
     assert(test("char a; auto b = a; return b.sizeof;", 1));
     assert(test("char a = cast(char)255; a = a + cast(char)1; a = a + cast(char)10; return a;", 10));
     assert(test("long a = 1; foreach(int i; 0 .. 100) if(i % 2 != 0) a = a * i; return cast(int)(a % 64);", 35));
+    assert(test("int a; auto p = &a; return p.sizeof;", 8));
+    assert(test("int a; auto p = &a; *p = 12; return *p;", 12));
+    assert(test("int a; auto p = &a; auto pp = &p; **pp = 12; return **pp;", 12));
+    assert(test("int a; int b; return &a == &a;", 1));
+    assert(test("int a; int b; return &a != &a;", 0));
+    assert(test("int a; int b; return &a != &b;", 1));
+    assert(test("int a; int b; return &a == &b;", 0));
 }
 
 

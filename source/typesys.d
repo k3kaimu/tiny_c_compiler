@@ -67,6 +67,19 @@ Type* make_pointer_type(Type* base)
 }
 
 
+Type* make_ref_type_of(Type* base)
+{
+    return make_pointer_type(base);
+}
+
+
+Type* make_deref_type_of(Type* base)
+{
+    assert(is_pointer_type(base));
+    return base.nested;
+}
+
+
 Type* make_void_pointer_type()
 {
     return make_pointer_type(make_void_type());
