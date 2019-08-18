@@ -453,6 +453,16 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             assert(lhs_reg.type.str == "i8");
             return gen_llvm_ir_binop_const(fp, "xor", lhs_reg, 1, val_cnt);
 
+        case NodeKind.OROR:
+            Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
+            return gen_llvm_ir_binop(fp, "or", lhs_reg, rhs_reg, val_cnt);
+
+        case NodeKind.ANDAND:
+            Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
+            return gen_llvm_ir_binop(fp, "and", lhs_reg, rhs_reg, val_cnt);
+
         case NodeKind.LVAR:
             RegType ty = make_llvm_ir_reg_type(node.type);
             gen_llvm_ir_load(fp, make_reg_str(ref_reg_type(ty), node.token.str), val_cnt);

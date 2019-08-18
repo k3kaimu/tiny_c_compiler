@@ -266,6 +266,7 @@ Token* tokenize(char[] str)
              || str[0 .. 2] == "<=" || str[0 .. 2] == ">="
              || str[0 .. 2] == ".."
              || str[0 .. 2] == "++" || str[0 .. 2] == "--"
+             || str[0 .. 2] == "||" || str[0 .. 2] == "&&"
             )
             {
                 cur = new_token(TokenKind.RESERVED, cur, str[0 .. 2]);

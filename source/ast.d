@@ -28,6 +28,8 @@ enum NodeKind
     PTR_REF,    // &
     PTR_DEREF,  // *
     NOT,        // !
+    ANDAND,     // &&
+    OROR,       // ||
     CAST,       // キャスト
     LVAR,       // ローカル変数
     NUM,        // 整数
@@ -428,11 +430,39 @@ Node* expr()
 // assign = equality ("=" assign)?
 Node* assign()
 {
-    Node* node = equality();
+    Node* node = ororexpr();
     if(consume_reserved("="))
         node = new_node(NodeKind.ASSIGN, node, assign());
 
     return node;
+}
+
+
+// ororexpr = andandexpr ("||" andandexpr)*
+Node* ororexpr()
+{
+    Node* node = andandexpr();
+
+    while(1) {
+        if(consume_reserved("||"))
+            node = new_node(NodeKind.OROR, node, andandexpr());
+        else
+            return node;
+    }
+}
+
+
+// andandexpr = equality ("&&" equality)*
+Node* andandexpr()
+{
+    Node* node = equality();
+
+    while(1) {
+        if(consume_reserved("&&"))
+            node = new_node(NodeKind.ANDAND, node, equality());
+        else
+            return node;
+    }
 }
 
 

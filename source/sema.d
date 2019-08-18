@@ -198,6 +198,19 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             node.type = bool_type;
             return;
         
+        case NodeKind.OROR:
+        case NodeKind.ANDAND:
+            semantic_analysis_node(node.lhs, env, func, program);
+            semantic_analysis_node(node.rhs, env, func, program);
+            auto bool_type = make_bool_type();
+            if(!is_same_type(node.lhs.type, bool_type))
+                node.lhs = new_node_cast_with_check(bool_type, node.lhs);
+            if(!is_same_type(node.rhs.type, bool_type))
+                node.rhs = new_node_cast_with_check(bool_type, node.rhs);
+
+            node.type = bool_type;
+            return;
+    
         case NodeKind.ASSIGN:
             semantic_analysis_node(node.lhs, env, func, program);
             semantic_analysis_node(node.rhs, env, func, program);
