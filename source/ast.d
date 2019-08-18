@@ -217,11 +217,16 @@ Node* expr_stmt_or_def_var()
     {
         Node* node = new Node;
         node.kind = NodeKind.LVAR_DEF;
-        node.def_var.type = type().type;
+        Node* def_type = type();
+        node.def_var.type = def_type.type;
         node.def_var.token = consume_ident();
         node.token = node.def_var.token;
         assert(node.def_var.type !is null);
-        assert(node.def_var.token !is null);
+        if(node.def_var.token is null) {
+            error_at(def_type.token.str.ptr, "型の後に識別子がありません．次のトークンは '%.*s' です",
+                token.str.length, token.str.ptr,
+            );
+        }
 
         if(consume_reserved("=")) {
             node.lhs = expr();
@@ -607,34 +612,64 @@ Node* new_node_lvar(Token* ident)
 }
 
 
-// type = basic_type "*"*
+// type = Ptr "!" (("(" type ")") | type)
+//      | typename "!" (("(" type ")") | type)
 //      | auto
+//      | basic_type
+//      | type "*"*
 Node* type()
 {
     Node* node = new Node;
     node.kind = NodeKind.TYPE;
+    node.token = token;
 
     if(consume(TokenKind.AUTO)) {
         Type* ty = new Type;
         ty.kind = TypeKind.BASE;
-        ty.islval = false;
         ty.str = "auto";
         ty.nested = null;
         node.type = ty;
         return node;
     }
 
-    Type* ty = basic_type();
-    while(consume_reserved("*")) {
-        Type* new_ty = new Type;
-        new_ty.kind = TypeKind.POINTER;
-        new_ty.str = ty.str ~ "*";
-        new_ty.nested = ty;
-        ty = new_ty;
+    if(consume(TokenKind.PTR)) {
+        expect("!");
+        bool b = consume_reserved("(");
+        Type* ty = new Type;
+        ty.nested = type().type;
+        ty.kind = TypeKind.POINTER;
+        ty.str = ty.nested.str ~ "*";
+        if(b) expect(")");
+        node.type = ty;
     }
 
-    node.type = ty;
+    if(consume(TokenKind.TYPENAME)) {
+        expect("!");
+        bool b = consume_reserved("(");
+        Type* ty = type().type;
+        node.type = ty;
+        if(b) expect(")");
+    }
+
+    if(node.type is null) {
+        if(auto ty = basic_type()) {
+            node.type = ty;
+        }
+    }
+
+    while(consume_reserved("*")) {
+        Type* ty = new Type;
+        ty.kind = TypeKind.POINTER;
+        ty.str = node.type.str ~ "*";
+        ty.nested = node.type;
+        node.type = ty;
+    }
+
+    if(node.type !is null)
     return node;
+
+    error_at(node.token.str.ptr, "型ではありません");
+    return null;
 }
 
 

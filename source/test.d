@@ -172,6 +172,9 @@ unittest
     assert(test("int a; int b; return &a != &a;", 0));
     assert(test("int a; int b; return &a != &b;", 1));
     assert(test("int a; int b; return &a == &b;", 0));
+    assert(test("Ptr!int p; int a; p = &a; *p = 12; return a;", 12));
+    assert(test("Ptr!(Ptr!int) pp; int a; Ptr!int p = &a; pp = &p; **pp = 12; return a;", 12));
+    assert(test("Typename!(int**) pp; int a; Typename!(int*) p = &a; pp = &p; **pp = 12; return a;", 12));
 }
 
 

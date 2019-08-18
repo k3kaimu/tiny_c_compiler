@@ -24,6 +24,8 @@ enum TokenKind
     INT,            // int
     LONG,           // long
     CAST,           // cast
+    PTR,            // Ptr
+    TYPENAME,       // Typename
     IDENT,          // 識別子
     NUM,            // 整数トークン
     EOF,            // 入力の終わりを表すトークン
@@ -233,6 +235,18 @@ Token* tokenize(char[] str)
             continue;
         }
 
+        if(size_t len = starts_with_reserved(str, "Ptr")) {
+            cur = new_token(TokenKind.PTR, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "Typename")) {
+            cur = new_token(TokenKind.TYPENAME, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
         if(str.length >= 2) {
             if( str[0 .. 2] == "==" || str[0 .. 2] == "!="
              || str[0 .. 2] == "<=" || str[0 .. 2] == ">="
@@ -261,7 +275,8 @@ Token* tokenize(char[] str)
         }
 
         if( str[0] == '+' || str[0] == '-' || str[0] == '*' || str[0] == '/' || str[0] == '%'
-         || str[0] == '(' || str[0] == ')' || str[0] == '>' || str[0] == '<' || str[0] == '&') {
+         || str[0] == '(' || str[0] == ')' || str[0] == '>' || str[0] == '<' || str[0] == '&'
+         || str[0] == '!') {
             cur = new_token(TokenKind.RESERVED, cur, str[0 .. 1]);
             str = str[1 .. $];
             continue;
