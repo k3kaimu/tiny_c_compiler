@@ -20,12 +20,16 @@ int Main(FILE* fp, int argc, char** argv)
     user_input = argv[1];
     size_t input_len = strlen(argv[1]);
     token = tokenize(argv[1][0 .. input_len]);
-    Node*[] func_defs = program();
+    Node*[] func_decl_defs = program();
 
-    semantic_analysis(func_defs);
+    semantic_analysis(func_decl_defs);
 
-    foreach(e; func_defs) {
+    foreach(e; func_decl_defs) {
+        if(e.kind == NodeKind.FUNC_DECL)
+            gen_llvm_ir_decl_func(fp, e);
+        else
         gen_llvm_ir_def_func(fp, e);
+
         fprintf(fp, "\n");
     }
 

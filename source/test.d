@@ -226,3 +226,20 @@ unittest
 
     assert(test_with_report(get_ir(code), 144));
 }
+
+// mallocテスト
+unittest
+{
+    auto code = q{
+        extern(C) char* malloc(long);
+        
+        int main()
+        {
+            auto buf = cast(int*) malloc(10 * 4);
+            *buf = 12;
+            return *buf;
+        }
+    }; 
+
+    assert(test_with_report(get_ir(code), 12));
+}

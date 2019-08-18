@@ -26,6 +26,7 @@ enum TokenKind
     CAST,           // cast
     PTR,            // Ptr
     TYPENAME,       // Typename
+    EXTERN_C,       // extern(C)
     IDENT,          // 識別子
     NUM,            // 整数トークン
     EOF,            // 入力の終わりを表すトークン
@@ -243,6 +244,12 @@ Token* tokenize(char[] str)
 
         if(size_t len = starts_with_reserved(str, "Typename")) {
             cur = new_token(TokenKind.TYPENAME, cur, str[0 .. len]);
+            str = str[len .. $];
+            continue;
+        }
+
+        if(size_t len = starts_with_reserved(str, "extern(C)")) {
+            cur = new_token(TokenKind.EXTERN_C, cur, str[0 .. len]);
             str = str[len .. $];
             continue;
         }

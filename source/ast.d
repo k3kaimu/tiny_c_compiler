@@ -38,6 +38,7 @@ enum NodeKind
     FOR,        // for, while
     FOREACH,    // foreach
     BREAK,      // break
+    FUNC_DECL,  // 関数宣言
     FUNC_DEF,   // 関数定義
     TYPE,       // 型
     LVAR_DEF,   // ローカル変数定義
@@ -131,9 +132,50 @@ Node*[] program()
     Node*[] nodes;
     int i = 0;
     while(!at_eof())
-        nodes ~= func_def();
+        nodes ~= func_decl();
 
     return nodes;
+}
+
+// func_decl = "extern(C)" type iden "(" (type ("," type)* ","?)? ")" ";"
+//           | func_def
+Node* func_decl()
+{
+    if(!consume(TokenKind.EXTERN_C))
+        return func_def();
+
+    Node* node = new Node;
+    node.kind = NodeKind.FUNC_DECL;
+    node.ret_type = type().type;
+    Token* func_name = consume_ident();
+    if(func_name is null) {
+        error_at(token.str.ptr, "関数宣言ではありません");
+        return null;
+    }
+
+    node.token = func_name;
+
+    Type* arg_type;
+
+    expect("(");
+    if(consume_reserved(")"))
+        goto Lbody;
+
+    arg_type = type().type;
+    node.func_def_args ~= Variable(arg_type, null);
+
+    while(!consume_reserved(")")) {
+        expect(",");
+        if(consume_reserved(")"))
+            break;
+
+        arg_type = type().type;
+        node.func_def_args ~= Variable(arg_type, null);
+    }
+
+  Lbody:
+    expect(";");
+    return node;
 }
 
 

@@ -51,8 +51,7 @@ void semantic_analysis(Node*[] program)
 {
     BlockEnv* env = new BlockEnv;
     foreach(func; program) {
-        assert(func.kind == NodeKind.FUNC_DEF);
-
+        if(func.kind == NodeKind.FUNC_DEF) {
         BlockEnv* new_env = new BlockEnv;
         foreach(e; func.func_def_args)
             new_env.var_defs ~= e;
@@ -60,6 +59,7 @@ void semantic_analysis(Node*[] program)
         foreach(s; func.func_def_body)
             semantic_analysis_node(s, new_env, func, program);
     }
+}
 }
 
 
@@ -354,8 +354,9 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             }
             return;
 
+        case NodeKind.FUNC_DECL:
         case NodeKind.FUNC_DEF:
-            error("関数定義の中に関数定義を含めることはできません");
+            error("関数定義の中に関数宣言/定義を含めることはできません");
             return;
 
         case NodeKind.TYPE:

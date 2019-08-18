@@ -127,6 +127,26 @@ Reg make_reg_from_Variable(Variable v)
 }
 
 
+void gen_llvm_ir_decl_func(FILE* fp, Node* node)
+{
+    {
+        RegType ret_type = make_llvm_ir_reg_type(node.ret_type);
+        fprintf(fp, "declare %.*s @%.*s(",
+            ret_type.str.length, ret_type.str.ptr,
+            node.token.str.length, node.token.str.ptr
+        );
+    }
+
+    foreach(i, e; node.func_def_args) {
+        RegType arg_type = make_llvm_ir_reg_type(e.type);
+        fprintf(fp, "%.*s", arg_type.str.length, arg_type.str.ptr);
+        if(i != node.func_def_args.length - 1)
+            fprintf(fp, ", ");
+    }
+    fprintf(fp, ")\n\n");
+}
+
+
 void gen_llvm_ir_def_func(FILE* fp, Node* node)
 {
     {
@@ -179,7 +199,7 @@ void gen_llvm_ir_def_func(FILE* fp, Node* node)
         ret_type.str.length, ret_type.str.ptr
     );
 
-    fprintf(fp, "}\n");
+    fprintf(fp, "}\n\n");
 }
 
 
