@@ -90,6 +90,10 @@ unittest
     assert(test("return -1<0;", 1));
     assert(test("return 1<=0;", 0));
     assert(test("return 0<=0;", 1));
+    assert(test("return !(0 == 0);", 0));
+    assert(test("return !!(0 == 0);", 1));
+    assert(test("return !0;", 1));
+    assert(test("return (!0).sizeof;", 1));
     assert(test("int a; return a=1;", 1));
     assert(test("int a; int b; return a=b=1;", 1));
     assert(test("int a=1; int b; return b=a*2;", 2));

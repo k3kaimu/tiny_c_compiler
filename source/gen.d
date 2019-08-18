@@ -39,7 +39,7 @@ RegType make_llvm_ir_reg_type(Type* type)
 
 int sizeof_reg_type(RegType type)
 {
-    if(type.str[$-1] == '*')
+    if(type.str.length && type.str[$-1] == '*')
         return 8;
 
     if(type.str == "i8")    return 1;
@@ -47,7 +47,7 @@ int sizeof_reg_type(RegType type)
     if(type.str == "i32")   return 4;
     if(type.str == "i64")   return 8;
 
-    assert(0, "Unknown type");
+    assert(0, "Unknown type: " ~ type.str);
     return -1;
 }
 
@@ -384,8 +384,13 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
             Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
             Reg icmp_reg = gen_llvm_ir_icmp(fp, node.kind, lhs_reg, rhs_reg, val_cnt);
-            fprintf(fp, "  %%%d = zext i1 %%%d to i32\n", ++*val_cnt, icmp_reg.id);
-            return make_reg_id(RegType("i32"), *val_cnt);
+            RegType ty = make_llvm_ir_reg_type(node.type);
+            return gen_llvm_ir_integer_cast(fp, ty, icmp_reg, val_cnt);
+
+        case NodeKind.NOT:
+            Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            assert(lhs_reg.type.str == "i8");
+            return gen_llvm_ir_binop_const(fp, "xor", lhs_reg, 1, val_cnt);
 
         case NodeKind.LVAR:
             RegType ty = make_llvm_ir_reg_type(node.type);
@@ -428,13 +433,19 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             RegType ty = make_llvm_ir_reg_type(node.type);
 
             if(is_integer_type(node.type)) {
+                if(node.type.str == "bool") {
+                    assert(is_integer_type(node.lhs.type) || is_pointer_type(node.lhs.type));
+                    auto i1_reg = gen_llvm_ir_icmp_ne_0(fp, lhs_reg, val_cnt);
+                    return gen_llvm_ir_integer_cast(fp, ty, i1_reg, val_cnt);
+                } else {
                 assert(is_integer_type(node.lhs.type));
-                gen_llvm_ir_integer_cast(fp, ty, lhs_reg, val_cnt);
+                    return gen_llvm_ir_integer_cast(fp, ty, lhs_reg, val_cnt);
+                }
             } else if(is_pointer_type(node.type)) {
                 assert(is_pointer_type(node.lhs.type));
-                gen_llvm_ir_pointer_cast(fp, ty, lhs_reg, val_cnt);
+                return gen_llvm_ir_pointer_cast(fp, ty, lhs_reg, val_cnt);
             }
-            return make_reg_id(ty, *val_cnt);
+            assert(0);
 
         case NodeKind.DOT:
             assert(node.token.str == "sizeof");
@@ -634,6 +645,9 @@ Reg gen_llvm_ir_icmp_ne_0(FILE* fp, Reg lhs_reg, int* val_cnt)
 {
     fprintf(fp, "  %%%d = icmp ne ", ++*val_cnt);
     gen_llvm_ir_reg_with_type(fp, lhs_reg);
+    if(is_pointer(lhs_reg))
+        fprintf(fp, ", null\n");
+    else
     fprintf(fp, ", 0\n");
     return make_reg_id(RegType("i1"), *val_cnt);
 }
@@ -651,6 +665,15 @@ Reg gen_llvm_ir_integer_cast(FILE* fp, RegType ty, Reg val, int* val_cnt)
 
     if(ty.str == val.type.str)
         return val;
+
+    if(val.type.str == "i1") {
+        fprintf(fp, "  %%%d = zext ", ++*val_cnt);
+        gen_llvm_ir_reg_with_type(fp, val);
+        fprintf(fp, " to %.*s\n",
+            ty.str.length, ty.str.ptr,
+        );
+        return make_reg_id(ty, *val_cnt);
+    }
 
     if(sizeof_reg_type(ty) < sizeof_reg_type(val.type)) {
         fprintf(fp, "  %%%d = trunc ", ++*val_cnt);

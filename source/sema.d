@@ -128,6 +128,15 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             node.type = make_bool_type();
             return;
         
+        case NodeKind.NOT:
+            semantic_analysis_node(node.lhs, env, func, program);
+            auto bool_type = make_bool_type();
+            if(!is_same_type(node.lhs.type, bool_type))
+                node.lhs = new_node_cast_with_check(bool_type, node.lhs);
+
+            node.type = bool_type;
+            return;
+        
         case NodeKind.ASSIGN:
             semantic_analysis_node(node.lhs, env, func, program);
             semantic_analysis_node(node.rhs, env, func, program);

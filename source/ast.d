@@ -25,6 +25,7 @@ enum NodeKind
     POST_DEC,   // --
     PTR_REF,    // &
     PTR_DEREF,  // *
+    NOT,        // !
     CAST,       // キャスト
     LVAR,       // ローカル変数
     NUM,        // 整数
@@ -455,7 +456,7 @@ Node* mul()
 }
 
 
-// unary = ("+" | "-" | "&" | "*")? unary
+// unary = ("+" | "-" | "&" | "*" | "!")? unary
 //       | ("++" | "--")? unary
 //       | "cast" "(" type ")" unary
 Node* unary()
@@ -495,6 +496,14 @@ Node* unary()
         Node* node = new Node;
         node.token = tk;
         node.kind = NodeKind.PTR_DEREF;
+        node.lhs = unary();
+        return node;
+    }
+    else if(consume_reserved("!"))
+    {
+        Node* node = new Node;
+        node.token = tk;
+        node.kind = NodeKind.NOT;
         node.lhs = unary();
         return node;
     }
