@@ -399,26 +399,26 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             Reg lhs_reg = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
             Reg rhs_reg = gen_llvm_ir_expr(fp, node.rhs, val_cnt);
             if(is_integer(lhs_reg) && is_integer(rhs_reg)) {
-            assert(lhs_reg.type.str == rhs_reg.type.str);
+                assert(lhs_reg.type.str == rhs_reg.type.str);
 
-            fprintf(fp, "  %%%d = ", ++*val_cnt);
-            switch(node.kind) {
-                case NodeKind.ADD: fprintf(fp, "add nsw "); break;
-                case NodeKind.SUB: fprintf(fp, "sub "); break;
-                case NodeKind.MUL: fprintf(fp, "mul nsw "); break;
-                case NodeKind.DIV: fprintf(fp, "sdiv "); break;
-                case NodeKind.REM: fprintf(fp, "srem "); break;
-                default: assert(0);
-            }
+                fprintf(fp, "  %%%d = ", ++*val_cnt);
+                switch(node.kind) {
+                    case NodeKind.ADD: fprintf(fp, "add nsw "); break;
+                    case NodeKind.SUB: fprintf(fp, "sub "); break;
+                    case NodeKind.MUL: fprintf(fp, "mul nsw "); break;
+                    case NodeKind.DIV: fprintf(fp, "sdiv "); break;
+                    case NodeKind.REM: fprintf(fp, "srem "); break;
+                    default: assert(0);
+                }
 
-            gen_llvm_ir_reg_with_type(fp, lhs_reg);
+                gen_llvm_ir_reg_with_type(fp, lhs_reg);
 
-            if(rhs_reg.str is null)
-                fprintf(fp, ", %%%d\n", rhs_reg.id);
-            else
-                fprintf(fp, ", %%%.*s\n", rhs_reg.str.length, rhs_reg.str.ptr);
+                if(rhs_reg.str is null)
+                    fprintf(fp, ", %%%d\n", rhs_reg.id);
+                else
+                    fprintf(fp, ", %%%.*s\n", rhs_reg.str.length, rhs_reg.str.ptr);
 
-            return make_reg_id(lhs_reg.type, *val_cnt);
+                return make_reg_id(lhs_reg.type, *val_cnt);
             } else if(is_pointer(lhs_reg) && is_integer(rhs_reg)) {
                 if(node.kind == NodeKind.SUB)
                     rhs_reg = gen_llvm_ir_binop_const(fp, "mul", rhs_reg, -1, val_cnt);
@@ -482,7 +482,7 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
             fprintf(fp, ")\n");
 
             if(ret_reg_type.str != "void")
-            return make_reg_id(ret_reg_type, *val_cnt);
+                return make_reg_id(ret_reg_type, *val_cnt);
             else
                 return make_reg_id(ret_reg_type, -1);
 
@@ -505,7 +505,7 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
                     auto i1_reg = gen_llvm_ir_icmp_ne_0(fp, lhs_reg, val_cnt);
                     return gen_llvm_ir_integer_cast(fp, ty, i1_reg, val_cnt);
                 } else {
-                assert(is_integer_type(node.lhs.type));
+                    assert(is_integer_type(node.lhs.type));
                     return gen_llvm_ir_integer_cast(fp, ty, lhs_reg, val_cnt);
                 }
             } else if(is_pointer_type(node.type)) {
@@ -526,6 +526,16 @@ Reg gen_llvm_ir_expr(FILE* fp, Node* node, int* val_cnt)
                 return make_reg_id(ty, *val_cnt);
             }
             break;
+
+        case NodeKind.INDEX:
+            Reg lhs = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            Reg idx = gen_llvm_ir_expr(fp, node.index_expr1, val_cnt);
+            Reg ptr = gen_llvm_ir_getelementptr_inbounds(fp, lhs, idx, val_cnt);
+            return gen_llvm_ir_load(fp, ptr, val_cnt);
+
+        case NodeKind.SLICE:
+            assert(0);
+
         case NodeKind.PRE_INC:
         case NodeKind.PRE_DEC:
         case NodeKind.POST_INC:
@@ -585,6 +595,11 @@ Reg gen_llvm_ir_expr_lval(FILE* fp, Node* node, int* val_cnt)
             Reg lhs = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
             assert(is_pointer(lhs));
             return lhs;
+
+        case NodeKind.INDEX:
+            Reg lhs = gen_llvm_ir_expr(fp, node.lhs, val_cnt);
+            Reg idx = gen_llvm_ir_expr(fp, node.index_expr1, val_cnt);
+            return gen_llvm_ir_getelementptr_inbounds(fp, lhs, idx, val_cnt);
 
         case NodeKind.LVAR:
             RegType ty = make_llvm_ir_reg_type(node.type);
@@ -715,7 +730,7 @@ Reg gen_llvm_ir_icmp_ne_0(FILE* fp, Reg lhs_reg, int* val_cnt)
     if(is_pointer(lhs_reg))
         fprintf(fp, ", null\n");
     else
-    fprintf(fp, ", 0\n");
+        fprintf(fp, ", 0\n");
     return make_reg_id(RegType("i1"), *val_cnt);
 }
 

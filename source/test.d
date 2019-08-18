@@ -166,6 +166,8 @@ unittest
     assert(test("char a; return a.sizeof;", 1));
     assert(test("short a; return a.sizeof;", 2));
     assert(test("int a; return a.sizeof;", 4));
+    assert(test("int a = 0; long b = 0; return (a+b).sizeof;", 8));
+    assert(test("int a = 0; long b = 0; return (b+a).sizeof;", 8));
     assert(test("char a; auto b = a; return b.sizeof;", 1));
     assert(test("char a = cast(char)255; a = a + cast(char)1; a = a + cast(char)10; return a;", 10));
     assert(test("long a = 1; foreach(int i; 0 .. 100) if(i % 2 != 0) a = a * i; return cast(int)(a % 64);", 35));
@@ -272,7 +274,18 @@ unittest
                     return 1;
             }
 
-            return 0;
+            pa = 1 + buf;
+            if(pa != &*(buf + 1))
+                return 1;
+
+            pa = pa - 1;
+            if(pa != buf)
+                return 1;
+
+            if(buf)
+                return 0;
+            else
+                return 1;
         }
     };
 
@@ -315,6 +328,34 @@ unittest
             int mem_max = 1;
             *(memory + 0) = 0;
             *(memory + 1) = 1;
+
+            return fib(12, memory, &mem_max);
+        }
+    };
+
+    assert(test_with_report(get_ir(code), 144));
+
+
+    code = q{
+        extern(C) void* malloc(long);
+
+        int fib(int n, int* mem, int* mem_max)
+        {
+            if(n <= *mem_max)
+                return mem[n];
+
+            int v = fib(n-1, mem, mem_max) + fib(n-2, mem, mem_max);
+            mem[n] = v;
+            *mem_max = n;
+
+            return v;
+        }
+
+        int main() {
+            auto memory = cast(int*) malloc(100 * 4);
+            int mem_max = 1;
+            memory[0] = 0;
+            memory[1] = 1;
 
             return fib(12, memory, &mem_max);
         }

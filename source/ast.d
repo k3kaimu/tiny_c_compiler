@@ -19,6 +19,8 @@ enum NodeKind
     GE,         // >=
     ASSIGN,     // =
     DOT,        // .
+    INDEX,      // [ expr1 ]
+    SLICE,      // [ expr1 .. expr2 ]
     PRE_INC,    // ++
     PRE_DEC,    // --
     POST_INC,   // ++
@@ -59,6 +61,11 @@ struct Node
     Node* rhs;
     int val;        // kindがNUMのときのみ使う
     Token* token;   // kindがIDENTのときのみ使う
+
+    // kind == INDEX:   lhs[index_expr1]
+    // kind == SLICE:   lhs[index_expr1 .. index_expr2]
+    Node* index_expr1;
+    Node* index_expr2;
 
     // if, if-else
     Node* cond;
@@ -565,6 +572,7 @@ Node* unary()
 //         | postfix "++"
 //         | postfix "--"
 //         | postfix "." ident
+//         | postfix "[" expr1 (".." expr2)? "]"
 Node* postfix()
 {
     Node* lhs = term();
@@ -604,6 +612,33 @@ Node* postfix()
             }
             continue;
         }
+
+        if(consume_reserved("[")) {
+            Node* expr1 = expr();
+
+            if(consume_reserved("..")) {
+                Node* expr2 = expr();
+                expect("]");
+                Node* new_node = new Node;
+                new_node.token = tk;
+                new_node.kind = NodeKind.SLICE;
+                new_node.index_expr1 = expr1;
+                new_node.index_expr2 = expr2;
+                new_node.lhs = lhs;
+                lhs = new_node;
+            } else {
+                expect("]");
+                Node* new_node = new Node;
+                new_node.token = tk;
+                new_node.kind = NodeKind.INDEX;
+                new_node.index_expr1 = expr1;
+                new_node.lhs = lhs;
+                lhs = new_node;
+            }
+
+            continue;
+        }
+
         return lhs;
     }
 
@@ -717,7 +752,7 @@ Node* type()
     }
 
     if(node.type !is null)
-    return node;
+        return node;
 
     error_at(node.token.str.ptr, "型ではありません");
     return null;

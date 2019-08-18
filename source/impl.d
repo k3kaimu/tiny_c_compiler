@@ -28,7 +28,7 @@ int Main(FILE* fp, int argc, char** argv)
         if(e.kind == NodeKind.FUNC_DECL)
             gen_llvm_ir_decl_func(fp, e);
         else
-        gen_llvm_ir_def_func(fp, e);
+            gen_llvm_ir_def_func(fp, e);
 
         fprintf(fp, "\n");
     }

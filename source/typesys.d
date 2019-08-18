@@ -189,5 +189,8 @@ bool is_castable_type(Type* ty1, Type* ty2)
     if(is_integer_type(ty1) && is_integer_type(ty2))
         return true;
 
+    if(is_pointer_type(ty2) && ty1.str == "bool")
+        return true;
+
     return false;
 }

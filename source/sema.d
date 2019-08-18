@@ -52,14 +52,14 @@ void semantic_analysis(Node*[] program)
     BlockEnv* env = new BlockEnv;
     foreach(func; program) {
         if(func.kind == NodeKind.FUNC_DEF) {
-        BlockEnv* new_env = new BlockEnv;
-        foreach(e; func.func_def_args)
-            new_env.var_defs ~= e;
+            BlockEnv* new_env = new BlockEnv;
+            foreach(e; func.func_def_args)
+                new_env.var_defs ~= e;
 
-        foreach(s; func.func_def_body)
-            semantic_analysis_node(s, new_env, func, program);
+            foreach(s; func.func_def_body)
+                semantic_analysis_node(s, new_env, func, program);
+        }
     }
-}
 }
 
 
@@ -268,7 +268,7 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
 
             node.type = def.ret_type;
             return;
-        
+
         case NodeKind.DOT:
             if(node.token.str == "sizeof") {
                 semantic_analysis_node(node.lhs, env, func, program);
@@ -278,6 +278,34 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             }
             assert(0);
             break;
+
+        case NodeKind.INDEX:
+            semantic_analysis_node(node.index_expr1, env, func, program);
+            semantic_analysis_node(node.lhs, env, func, program);
+            if(!is_pointer_type(node.lhs.type)) {
+                error("型 '%.*s' にインデックス演算子は適用できません",
+                    node.lhs.type.str.length, node.lhs.type.str.ptr,
+                );
+                return;
+            }
+
+            if(!is_integer_type(node.index_expr1.type)) {
+                error("インデックス演算子の添字は型 '%.*s' であり整数ではありません.",
+                    node.index_expr1.type.str.length, node.index_expr1.type.str.ptr,
+                );
+                return;
+            }
+
+            Type* ty_long = make_basic_type("long");
+            if(!is_same_type(node.index_expr1.type, ty_long))
+                node.index_expr1 = new_node_cast_with_check(ty_long, node.index_expr1);
+
+            node.type = make_deref_type_of(node.lhs.type);
+            node.type.islval = true;
+            return;
+
+        case NodeKind.SLICE:
+            assert(0);
 
         case NodeKind.PRE_INC:
         case NodeKind.PRE_DEC:
@@ -294,7 +322,7 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             else
                 node.type.islval = false;
             return;
-        
+
         case NodeKind.PTR_REF:
             semantic_analysis_node(node.lhs, env, func, program);
             if(! node.lhs.type.islval) {
