@@ -26,7 +26,9 @@ RegType make_llvm_ir_reg_type(Type* type)
         else
             return ref_reg_type(nested);
     } else {
-        if(type.str == "void")
+        if(type.str == "...")
+            ret.str = "...";
+        else if(type.str == "void")
             ret.str = "void";
         else if(type.str == "char" || type.str == "bool" || type.str == "byte")
             ret.str = "i8";
@@ -525,10 +527,19 @@ Reg gen_llvm_ir_expr(LLVM_IR_Env* env, Node* node)
                 fprintf(env.fp, "  %%%d = ", ++env.val_cnt);
             }
 
-            fprintf(env.fp, "call %.*s @%.*s(",
-                ret_reg_type.str.length, ret_reg_type.str.ptr,
-                node.token.str.length, node.token.str.ptr,
-            );
+            fprintf(env.fp, "call %.*s ", ret_reg_type.str.length, ret_reg_type.str.ptr);
+            if(node.func_def_args.length) {
+                fprintf(env.fp, "(");
+                foreach(i, e; node.func_def_args) {
+                    RegType ty = make_llvm_ir_reg_type(e.type);
+                    fprintf(env.fp, "%.*s", ty.str.length, ty.str.ptr);
+                    if(i != node.func_def_args.length - 1)
+                        fprintf(env.fp, ", ");
+                }
+                fprintf(env.fp, ") ");
+            }
+            fprintf(env.fp, "@%.*s(", node.token.str.length, node.token.str.ptr);
+
             foreach(i, e; arg_regs) {
                 gen_llvm_ir_reg_with_type(env.fp, e);
                 if(i != arg_regs.length -1)

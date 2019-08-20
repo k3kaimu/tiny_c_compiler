@@ -271,6 +271,12 @@ Token* tokenize(char[] str)
             continue;
         }
 
+        if(str.length >= 3 && str[0 .. 3] == "...") {
+            cur = new_token(TokenKind.RESERVED, cur, str[0 .. 3]);
+            str = str[3 .. $];
+            continue;
+        }
+
         if(str.length >= 2) {
             if( str[0 .. 2] == "==" || str[0 .. 2] == "!="
              || str[0 .. 2] == "<=" || str[0 .. 2] == ">="

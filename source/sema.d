@@ -263,26 +263,39 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
                 );
             }
 
+            size_t cnt_named_args = def.func_def_args.length;
+            foreach(i, e; def.func_def_args) {
+                if(e.type.str == "...") {
+                    cnt_named_args = i;
+                    break;
+                }
+            }
+
             foreach(i; 0 .. node.func_call_args.length) {
                 semantic_analysis_node(node.func_call_args[i], env, func, program);
 
                 Node* call_arg = node.func_call_args[i];
                 Type* call_type = call_arg.type;
-                Type* def_type = def.func_def_args[i].type;
 
-                semantic_analysis_node(call_arg, env, func, program);
-                if(!is_compatible_type(def_type, call_type)) {
-                    error_at(node.token.str.ptr, "関数'%.*s'の第%d引数の型は '%.*s' ですが '%.*s' で呼び出されています",
-                        def.token.str.length, def.token.str.ptr,
-                        def_type.str.length, def_type.str.ptr,
-                        call_type.str.length, call_type.str.ptr,
-                    );
+                if(i > cnt_named_args) {
+                    Type* def_type = def.func_def_args[i].type;
+
+                    if(!is_compatible_type(def_type, call_type)) {
+                        error_at(node.token.str.ptr, "関数'%.*s'の第%d引数の型は '%.*s' ですが '%.*s' で呼び出されています",
+                            def.token.str.length, def.token.str.ptr,
+                            def_type.str.length, def_type.str.ptr,
+                            call_type.str.length, call_type.str.ptr,
+                        );
+                    }
+
+                    if(!is_same_type(def_type, call_type))
+                        node.func_call_args[i] = new_node_cast_with_check(def_type, call_arg);
+                } else if(is_same_type(call_type, make_basic_type("float"))) {
+                    node.func_call_args[i] = new_node_cast_with_check(make_basic_type("double"), call_arg);
                 }
-
-                if(!is_same_type(def_type, call_type))
-                    node.func_call_args[i] = new_node_cast_with_check(def_type, call_arg);
             }
 
+            node.func_def_args = def.func_def_args;
             node.type = def.ret_type;
             return;
 

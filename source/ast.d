@@ -149,53 +149,38 @@ Node*[] program()
     return nodes;
 }
 
-// func_decl = "extern(C)" type iden "(" (type ("," type)* ","?)? ")" ";"
-//           | func_def
+// func_decl = "extern(C)" func_ident_with_args ";"
+//           | func_decldef
 Node* func_decl()
 {
     if(!consume(TokenKind.EXTERN_C))
-        return func_def();
+        return func_decldef();
 
-    Node* node = new Node;
+    Node* node = func_ident_with_args(false);
     node.kind = NodeKind.FUNC_DECL;
-    node.ret_type = type().type;
-    Token* func_name = consume_ident();
-    if(func_name is null) {
-        error_at(token.str.ptr, "関数宣言ではありません");
-        return null;
-    }
-
-    node.token = func_name;
-
-    Type* arg_type;
-
-    expect("(");
-    if(consume_reserved(")"))
-        goto Lbody;
-
-    arg_type = type().type;
-    node.func_def_args ~= Variable(arg_type, null);
-
-    while(!consume_reserved(")")) {
-        expect(",");
-        if(consume_reserved(")"))
-            break;
-
-        arg_type = type().type;
-        node.func_def_args ~= Variable(arg_type, null);
-    }
-
-  Lbody:
     expect(";");
     return node;
 }
 
 
-// func_def = type iden "(" (type iden ("," type iden)* ","?)? ")" "{" stmt* "}"
-Node* func_def()
+// func_def = func_ident_with_args "{" stmt* "}"
+Node* func_decldef()
+{
+    Node* node = func_ident_with_args(true);
+    node.kind = NodeKind.FUNC_DEF;
+
+    expect("{");
+    while(!consume_reserved("}"))
+        node.func_def_body ~= stmt();
+
+    return node;
+}
+
+
+// func_ident_with_args =  type iden "(" (type iden ("," type iden)* ","?)? ")"
+Node* func_ident_with_args(bool need_args_ident)
 {
     Node* node = new Node;
-    node.kind = NodeKind.FUNC_DEF;
     node.ret_type = type().type;
     Token* func_name = consume_ident();
     if(func_name is null) {
@@ -205,43 +190,47 @@ Node* func_def()
 
     node.token = func_name;
 
-    Type* arg_type;
-    Token* arg_ident;
+    Type* arg_type = null;
+    Token* arg_ident = null;
 
     expect("(");
     if(consume_reserved(")"))
-        goto Lbody;
+        return node;
 
-    arg_type = type().type;
-    arg_ident = consume_ident();
-    if(arg_ident is null) {
+    node.func_def_args ~= func_arg();
+
+    if(need_args_ident && node.func_def_args[0].token is null) {
         error("関数%.*sの第1引数は識別子ではありません", func_name.str.length, func_name.str.ptr);
-        return null;
     }
-
-    node.func_def_args ~= Variable(arg_type, arg_ident);
 
     while(!consume_reserved(")")) {
         expect(",");
         if(consume_reserved(")"))
             break;
 
-        arg_type = type().type;
-        arg_ident = consume_ident();
-        if(arg_ident is null) {
-            error("関数%.*sの第%d引数は識別子ではありません", func_name.str.length, func_name.str.ptr, node.func_def_args.length + 1);
+        node.func_def_args ~= func_arg();
+
+        if(need_args_ident && node.func_def_args[$-1].token is null) {
+            error("関数%.*sの第%d引数は識別子ではありません", func_name.str.length, func_name.str.ptr, node.func_def_args.length);
             return null;
         }
-
-        node.func_def_args ~= Variable(arg_type, arg_ident);
     }
 
-  Lbody:
-    expect("{");
-    while(!consume_reserved("}"))
-        node.func_def_body ~= stmt();
-
     return node;
+}
+
+
+// func_arg = type ident?
+//          = "..."
+Variable func_arg()
+{
+    if(consume_reserved("...")) {
+        return Variable(make_basic_type("..."), null);
+    }
+
+    Type* arg_type = type().type;
+    Token* arg_ident = consume_ident();
+    return Variable(arg_type, arg_ident);
 }
 
 

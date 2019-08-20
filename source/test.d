@@ -412,4 +412,15 @@ unittest
         }
     };
     assert(test_with_report(get_ir(code), 0, "Hello, world!\n"));
+
+
+    code = q{
+        extern(C) int printf(char*, ...);
+
+        int main() {
+            printf("Hello, world!\n");
+            return 0;
+        }
+    };
+    assert(test_with_report(get_ir(code), 0, "Hello, world!\n"));
 }
