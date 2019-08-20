@@ -33,6 +33,7 @@ enum NodeKind
     CAST,       // キャスト
     LVAR,       // ローカル変数
     NUM,        // 整数
+    STR_LIT,    // 文字列リテラル
     FUNC_CALL,  // 関数呼び出し
     EXPR_STMT,  // 式文
     BLOCK,      // block { stmt* }
@@ -62,6 +63,7 @@ struct Node
     Node* lhs;
     Node* rhs;
     int val;        // kindがNUMのときのみ使う
+    const(ubyte)[] str_lit_data;    // kindがSTR_LITのときのみ使う
     Token* token;   // kindがIDENTのときのみ使う
 
     // kind == INDEX:   lhs[index_expr1]
@@ -678,6 +680,7 @@ Node* postfix()
 
 
 // term = num
+//      | string_literal
 //      | iden ( "("  ")" )?
 //      | iden "(" expr ("," expr)* ","? ")"
 //      | "(" expr ")"
@@ -714,6 +717,16 @@ Node* term()
             // 変数
             return new_node_lvar(tok);
         }
+    }
+
+    if(token.kind == TokenKind.STR_LIT) {
+        Token* tk = pop_token();
+
+        Node* node = new Node;
+        node.token = tk;
+        node.kind = NodeKind.STR_LIT;
+        node.str_lit_data = tk.str_lit_data;
+        return node;
     }
 
     return new_node_num(token, expect_number());

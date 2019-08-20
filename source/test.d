@@ -36,10 +36,10 @@ auto get_ir(string code)
 }
 
 
-bool test_with_report(string ir, int expected)
+bool test_with_report(string ir, int expected, string expected_str = null)
 {
     auto lli = execute_lli(ir);
-    if(lli.status == expected)
+    if(lli.status == expected && (expected_str is null || lli.output == expected_str))
         return true;
 
     writeln("Unittest is failed.");
@@ -389,4 +389,27 @@ unittest
     };
 
     assert(test_with_report(get_ir(code), 144));
+}
+
+// 文字列のテスト
+unittest
+{
+    auto code = q{
+        extern(C) int putchar(int);
+        extern(C) int strlen(char*);
+
+        int main() {
+            auto cptr = "Hello, world!\n";
+
+            if(strlen(cptr) != 14)
+                return 1;
+
+            while(*cptr) {
+                putchar(*cptr);
+                ++cptr;
+            }
+            return 0;
+        }
+    };
+    assert(test_with_report(get_ir(code), 0, "Hello, world!\n"));
 }

@@ -251,6 +251,10 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
             node.type = make_int_type();
             return;
 
+        case NodeKind.STR_LIT:
+            node.type = make_ref_type_of(make_basic_type("char"));
+            return;
+
         case NodeKind.FUNC_CALL:
             Node* def = lookup_function(program, node.token.str);
             if(def is null) {

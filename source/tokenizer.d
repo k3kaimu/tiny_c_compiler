@@ -30,6 +30,7 @@ enum TokenKind
     EXTERN_C,       // extern(C)
     IDENT,          // 識別子
     NUM,            // 整数トークン
+    STR_LIT,        // 文字列リテラル
     EOF,            // 入力の終わりを表すトークン
 }
 
@@ -40,6 +41,7 @@ struct Token
     Token *next;    // 次の入力トークン
     int val;        // kindがTK_NUMの場合，その数値
     const(char)[] str;
+    const(ubyte)[] str_lit_data;
 }
 
 
@@ -55,6 +57,14 @@ Token* save_tokenizer()
 void restore_tokenizer(Token* new_head)
 {
     token = new_head;
+}
+
+
+Token* pop_token()
+{
+    Token* ret = token;
+    token = token.next;
+    return ret;
 }
 
 
@@ -324,6 +334,15 @@ Token* tokenize(char[] str)
             continue;
         }
 
+        if(str[0] == '"') {
+            size_t lit_len;
+            ubyte[] data = get_string_literal_value(str, lit_len);
+            cur = new_token(TokenKind.STR_LIT, cur, str[0 .. lit_len]);
+            cur.str_lit_data = data;
+            str = str[lit_len .. $];
+            continue;
+        }
+
         error_at(str.ptr, "トークナイズできません");
     }
 
@@ -380,4 +399,61 @@ unittest
     s = "1_ 123";
     assert(get_int_literal_value(s, len) == 1);
     assert(s[len .. $] == "_ 123");
+}
+
+
+ubyte[] get_string_literal_value(const(char)[] str, ref size_t len)
+{
+    assert(str[0] == '"');
+    assert(str.length >= 2);
+
+    ubyte[] data;
+    size_t i = 1;
+    while(str[i] != '"') {
+        if(str[i] == '\\') {
+            if(str.length == i) goto Lerror;
+            ++i;
+            switch(str[i]) {
+                case 'a': data ~= '\a'; break;
+                case 'b': data ~= '\b'; break;
+                case 'f': data ~= '\f'; break;
+                case 'n': data ~= '\n'; break;
+                case 'r': data ~= '\r'; break;
+                case 't': data ~= '\t'; break;
+                case 'v': data ~= '\v'; break;
+                case '0': data ~= '\0'; break;
+                default: data ~= str[i];
+            }
+        } else {
+            data ~= str[i];
+        }
+
+        ++i;
+        continue;
+
+     Lerror:
+        error_at(str.ptr, "文字列リテラルが終わっていません");
+    }
+
+    len = i + 1;
+    data ~= '\0';
+
+    return data;
+}
+
+unittest
+{
+    size_t len;
+    ubyte[] data;
+    data = get_string_literal_value(q{"1234567890"}, len);
+    assert(len == 12);
+    assert(data == cast(ubyte[])"1234567890\0");
+
+    data = get_string_literal_value(q{"\a\b"}, len);
+    assert(len == 6);
+    assert(data == ['\a', '\b', '\0']);
+
+    data = get_string_literal_value(q{"\"\'\n \0"}, len);
+    assert(len == 11);
+    assert(data == ['\"', '\'', '\n', ' ', '\0', '\0']);
 }

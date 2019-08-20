@@ -6,6 +6,7 @@ import typesys;
 
 import core.stdc.stdio;
 import core.stdc.stdlib;
+import core.stdc.ctype;
 
 
 struct RegType
@@ -162,31 +163,24 @@ Reg make_reg_from_Variable(Variable v)
 }
 
 
-void gen_llvm_ir_decl_func(FILE* fp, Node* node)
+void gen_llvm_ir_decl_def(LLVM_IR_Env* env, Node*[] program)
 {
-    {
-        RegType ret_type = make_llvm_ir_reg_type(node.ret_type);
-        fprintf(fp, "declare %.*s @%.*s(",
-            ret_type.str.length, ret_type.str.ptr,
-            node.token.str.length, node.token.str.ptr
-        );
-    }
+    foreach(e; program) {
+        if(e.kind == NodeKind.FUNC_DECL)
+            gen_llvm_ir_decl_func(env, e);
+        else
+            gen_llvm_ir_def_func(env, e);
 
-    foreach(i, e; node.func_def_args) {
-        RegType arg_type = make_llvm_ir_reg_type(e.type);
-        fprintf(fp, "%.*s", arg_type.str.length, arg_type.str.ptr);
-        if(i != node.func_def_args.length - 1)
-            fprintf(fp, ", ");
+        fprintf(env.fp, "\n");
     }
-    fprintf(fp, ")\n\n");
 }
 
 
-void gen_llvm_ir_def_func(FILE* fp, Node* node)
+void gen_llvm_ir_decl_func(LLVM_IR_Env* env, Node* node)
 {
     {
         RegType ret_type = make_llvm_ir_reg_type(node.ret_type);
-        fprintf(fp, "define %.*s @%.*s(",
+        fprintf(env.fp, "declare %.*s @%.*s(",
             ret_type.str.length, ret_type.str.ptr,
             node.token.str.length, node.token.str.ptr
         );
@@ -194,48 +188,66 @@ void gen_llvm_ir_def_func(FILE* fp, Node* node)
 
     foreach(i, e; node.func_def_args) {
         RegType arg_type = make_llvm_ir_reg_type(e.type);
-        fprintf(fp, "%.*s", arg_type.str.length, arg_type.str.ptr);
+        fprintf(env.fp, "%.*s", arg_type.str.length, arg_type.str.ptr);
         if(i != node.func_def_args.length - 1)
-            fprintf(fp, ", ");
+            fprintf(env.fp, ", ");
     }
-    fprintf(fp, ") {\n");
-    fprintf(fp, "entry:\n");
+    fprintf(env.fp, ")\n\n");
+}
+
+
+void gen_llvm_ir_def_func(LLVM_IR_Env* env, Node* node)
+{
+    {
+        RegType ret_type = make_llvm_ir_reg_type(node.ret_type);
+        fprintf(env.fp, "define %.*s @%.*s(",
+            ret_type.str.length, ret_type.str.ptr,
+            node.token.str.length, node.token.str.ptr
+        );
+    }
+
+    foreach(i, e; node.func_def_args) {
+        RegType arg_type = make_llvm_ir_reg_type(e.type);
+        fprintf(env.fp, "%.*s", arg_type.str.length, arg_type.str.ptr);
+        if(i != node.func_def_args.length - 1)
+            fprintf(env.fp, ", ");
+    }
+    fprintf(env.fp, ") {\n");
+    fprintf(env.fp, "entry:\n");
 
     const(char[])[] lvar_defined;
 
-    LLVM_IR_Env env;
-    env.fp = fp;
     env.block_cnt = 0;
     env.loop_cnt = 0;
     env.val_cnt = cast(int)node.func_def_args.length - 1;
 
     foreach(i, e; node.func_def_args) {
-        Reg reg = gen_llvm_ir_alloca(&env, e.type, e.token.str);
-        gen_llvm_ir_store(&env, make_reg_id(make_llvm_ir_reg_type(e.type), cast(int)i), reg);
+        Reg reg = gen_llvm_ir_alloca(env, e.type, e.token.str);
+        gen_llvm_ir_store(env, make_reg_id(make_llvm_ir_reg_type(e.type), cast(int)i), reg);
         lvar_defined ~= e.token.str;
     }
 
     foreach(e; node.func_def_body)
-        gen_llvm_ir_def_lvars(&env, e, lvar_defined);
+        gen_llvm_ir_def_lvars(env, e, lvar_defined);
 
-    gen_llvm_ir_def_lvar(&env, node.ret_type, "__ret_var", lvar_defined);
+    gen_llvm_ir_def_lvar(env, node.ret_type, "__ret_var", lvar_defined);
 
     RegType ret_type = make_llvm_ir_reg_type(node.ret_type);
 
     foreach(e; node.func_def_body)
-        gen_llvm_ir_stmt(&env, e);
+        gen_llvm_ir_stmt(env, e);
 
-    fprintf(fp, "  br label %%LRET\n\n");
-    fprintf(fp, "LRET:\n");
-    fprintf(fp, "  %%__ret_val = load %.*s, %.*s* %%__ret_var\n",
+    fprintf(env.fp, "  br label %%LRET\n\n");
+    fprintf(env.fp, "LRET:\n");
+    fprintf(env.fp, "  %%__ret_val = load %.*s, %.*s* %%__ret_var\n",
         ret_type.str.length, ret_type.str.ptr,
         ret_type.str.length, ret_type.str.ptr,
     );
-    fprintf(fp, "  ret %.*s %%__ret_val\n",
+    fprintf(env.fp, "  ret %.*s %%__ret_val\n",
         ret_type.str.length, ret_type.str.ptr
     );
 
-    fprintf(fp, "}\n\n");
+    fprintf(env.fp, "}\n\n");
 }
 
 
@@ -402,6 +414,27 @@ Reg gen_llvm_ir_expr(LLVM_IR_Env* env, Node* node)
                 node.val);
 
             return make_reg_id(ty, env.val_cnt);
+
+        case NodeKind.STR_LIT:
+            RegType ty = make_llvm_ir_reg_type(node.type);
+            long len = node.str_lit_data.length;
+
+            fprintf(env.header_fp, "@.constval.%d = private unnamed_addr constant [%lld x i8] c\"",
+                ++env.constval_cnt, len
+            );
+            foreach(ubyte c; node.str_lit_data) {
+                if(isprint(c)) {
+                    fputc(c, env.header_fp);
+                } else {
+                    fprintf(env.header_fp, "\\%02X", c);
+                }
+            }
+            fprintf(env.header_fp, "\", align 1\n\n");
+            fprintf(env.fp, "  %%%d  = getelementptr inbounds [%lld x i8], [%lld x i8]* @.constval.%d, i32 0, i32 0\n",
+                ++env.val_cnt, len, len, env.constval_cnt
+            );
+
+            return make_reg_id(RegType("i8*"), env.val_cnt);
 
         case NodeKind.ADD:
         case NodeKind.SUB:

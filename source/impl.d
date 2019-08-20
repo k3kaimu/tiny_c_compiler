@@ -24,14 +24,14 @@ int Main(FILE* fp, int argc, char** argv)
 
     semantic_analysis(func_decl_defs);
 
-    foreach(e; func_decl_defs) {
-        if(e.kind == NodeKind.FUNC_DECL)
-            gen_llvm_ir_decl_func(fp, e);
-        else
-            gen_llvm_ir_def_func(fp, e);
+    LLVM_IR_Env env;
+    env.header_fp = tmpfile();
+    env.fp = tmpfile();
+    env.constval_cnt = 0;
+    gen_llvm_ir_decl_def(&env, func_decl_defs);
 
-        fprintf(fp, "\n");
-    }
+    concat_ir(fp, env.header_fp);
+    concat_ir(fp, env.fp);
 
     return 0;
 }
