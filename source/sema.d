@@ -277,7 +277,7 @@ void semantic_analysis_node(Node* node, BlockEnv* env, Node* func, Node*[] progr
                 Node* call_arg = node.func_call_args[i];
                 Type* call_type = call_arg.type;
 
-                if(i > cnt_named_args) {
+                if(i < cnt_named_args) {
                     Type* def_type = def.func_def_args[i].type;
 
                     if(!is_compatible_type(def_type, call_type)) {

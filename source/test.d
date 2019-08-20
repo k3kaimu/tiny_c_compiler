@@ -418,9 +418,11 @@ unittest
         extern(C) int printf(char*, ...);
 
         int main() {
-            printf("Hello, world!\n");
+            int d = 12;
+            auto s = "foo";
+            printf("Hello, world! %d %s\n", d, s);
             return 0;
         }
     };
-    assert(test_with_report(get_ir(code), 0, "Hello, world!\n"));
+    assert(test_with_report(get_ir(code), 0, "Hello, world! 12 foo\n"));
 }
