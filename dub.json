@@ -1,0 +1,7 @@
+{
+    "name": "tbcc",
+    "description": "Tiny better C compiler",
+    "authors": ["Kazuki Komatsu"],
+    "license": "NYSL",
+    "copyright": "Copyright © 2021, Kazuki Komatsu",
+}
